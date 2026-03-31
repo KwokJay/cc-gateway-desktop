@@ -1,7 +1,8 @@
 {
   "name": "cc-gateway",
   "version": "0.1.0",
-  "description": "Claude Code identity gateway - reverse proxy that unifies device fingerprints for shared accounts",
+  "description": "AI API identity gateway — reverse proxy that normalizes device fingerprints and telemetry for privacy-preserving API proxying",
+  "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

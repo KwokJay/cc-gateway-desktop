@@ -1,165 +1,214 @@
-# CC Gateway
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset=".github/logo-light.svg">
+    <img alt="CC Gateway" src=".github/logo-light.svg" width="440">
+  </picture>
 
-Reverse proxy that unifies device fingerprints for shared Claude Code accounts. All client machines appear as a single device to Anthropic.
+  <p>Take back control of your AI API telemetry</p>
+</div>
 
-## How it works
+<div align="center">
 
+[![License: MIT][license-shield]][license-url]
+[![Version][version-shield]][version-url]
+[![Tests][tests-shield]][tests-url]
+
+</div>
+
+<div align="center">
+  <a href="#quick-start">Quick Start</a> &middot;
+  <a href="#client-setup">Client Setup</a> &middot;
+  <a href="#what-gets-rewritten">What Gets Rewritten</a> &middot;
+  <a href="#clash-rules">Clash Rules</a>
+</div>
+
+---
+
+> **Alpha** — This project is under active development. Test with a non-primary account first.
+
+> **Disclaimer** — This software is provided for security research and privacy auditing purposes. It is the user's responsibility to comply with applicable terms of service. The authors assume no liability for misuse.
+
+## Why
+
+Claude Code collects **640+ telemetry event types** across 3 parallel channels, fingerprints your machine with **40+ environment dimensions**, and phones home every 5 seconds. Your device ID, email, OS version, installed runtimes, shell type, CPU architecture, and physical RAM are all reported to the vendor — continuously.
+
+If you run Claude Code on multiple machines, each device gets a unique permanent identifier. There is no built-in way to manage how your identity is presented to the API.
+
+CC Gateway is a reverse proxy that sits between Claude Code and the Anthropic API. It normalizes device identity, environment fingerprints, and process metrics to a single canonical profile — giving you control over what telemetry leaves your network.
+
+## Features
+
+- **Full identity rewrite** — device ID, email, session metadata, and the `user_id` JSON blob in every API request are normalized to one canonical identity
+- **40+ environment dimensions replaced** — platform, architecture, Node.js version, terminal, package managers, runtimes, CI flags, deployment environment — the entire `env` object is swapped, not patched
+- **System prompt sanitization** — the `<env>` block injected into every prompt (Platform, Shell, OS Version, working directory) is rewritten to match the canonical profile, preventing cross-reference detection between telemetry and prompt content
+- **Process metrics normalization** — physical RAM (`constrainedMemory`), heap size, and RSS are masked to canonical values so hardware differences don't leak
+- **Centralized OAuth** — the gateway manages token refresh internally; client machines never contact `platform.claude.com` and never need a browser login
+- **Telemetry leak prevention** — strips `baseUrl` and `gateway` fields that would reveal proxy usage in analytics events
+- **Three-layer defense architecture** — env vars (voluntary routing) + Clash rules (network-level blocking) + gateway rewriting (identity normalization)
+
+## Quick Start
+
+### 1. Install and configure
+
+```bash
+git clone https://github.com/whiletrue0x/cc-gateway.git
+cd cc-gateway
+npm install
+
+# Generate canonical identity
+npm run generate-identity
+# Generate a client token
+npm run generate-token my-machine
+
+# Configure
+cp config.example.yaml config.yaml
+# Edit config.yaml: paste device_id, client token, and OAuth refresh_token
 ```
-Clients (multiple machines)          CC Gateway              Anthropic
-┌──────────┐                    ┌─────────────────┐
-│ Machine A │─── env vars ──────│                 │
-│ Machine B │─── route all ─────│  Rewrite:       │──── single ────▶ api.anthropic.com
-│ Machine C │─── CC traffic ────│  device_id      │     device      (sees one Mac,
-└──────────┘    to gateway      │  env 40+ fields │     identity     one user)
-                                │  process metrics│
-                                │  prompt text    │
-                                │  HTTP headers   │
-                                │  OAuth token    │
-                                └─────────────────┘
-```
 
-Three-layer defense:
-
-| Layer | Mechanism | Purpose |
-|-------|-----------|---------|
-| 1. Env vars | `ANTHROPIC_BASE_URL` + `DISABLE_NONESSENTIAL` | CC voluntarily routes to gateway |
-| 2. Clash rules | `*.anthropic.com → REJECT` | Network-level block of direct connections |
-| 3. Gateway rewrite | device_id / env / process / prompt | Clean all fingerprints |
-
-## Gateway setup (admin, one-time)
-
-### 1. Extract OAuth token
-
-On a machine that has logged into Claude Code:
+### 2. Extract OAuth token (on a machine that has logged into Claude Code)
 
 ```bash
 bash scripts/extract-token.sh
+# Copies refresh_token from macOS Keychain → paste into config.yaml
 ```
 
-This extracts the `refresh_token` from macOS Keychain. The gateway manages token refresh — clients never need to login.
-
-### 2. Configure
+### 3. Start the gateway
 
 ```bash
-cp config.example.yaml config.yaml
+# Development (no TLS)
+npm run dev
 
-# Generate a canonical device identity
-npm run generate-identity
-# Generate auth tokens for each client
-npm run generate-token machine-a
-npm run generate-token machine-b
-```
+# Production
+npm run build && npm start
 
-Edit `config.yaml`:
-- Paste the `refresh_token` from step 1
-- Paste the generated `device_id`
-- Paste client tokens
-- Set `prompt_env` to match `env` (platform, shell, OS version)
-
-### 3. TLS certificate
-
-```bash
-mkdir certs
-# Self-signed (internal use):
-openssl req -x509 -newkey rsa:2048 -keyout certs/key.pem -out certs/cert.pem -days 365 -nodes -subj '/CN=cc-gateway'
-# Or use Let's Encrypt for a public domain
-```
-
-### 4. Start
-
-```bash
-# Docker (recommended)
+# Docker
 docker-compose up -d
-
-# Or direct
-npm install && npm run build && npm start
 ```
 
-### 5. Verify
+### 4. Verify
 
 ```bash
-# Health check (no auth)
-curl https://gateway:8443/_health
+# Health check
+curl http://localhost:8443/_health
 
-# Rewrite verification (auth required)
-curl -H "Authorization: Bearer <token>" https://gateway:8443/_verify
+# Rewrite verification (shows before/after diff)
+curl -H "Authorization: Bearer <your-token>" http://localhost:8443/_verify
 ```
 
-## Client setup (each machine)
+## Client Setup
 
-### Option A: Script
+Add these environment variables on each client machine. No browser login needed.
 
 ```bash
-bash <(curl -s https://gateway:8443/setup.sh)
-# or
+# Route all Claude Code traffic through the gateway
+export ANTHROPIC_BASE_URL="https://gateway.your-domain.com:8443"
+
+# Disable side-channel telemetry (Datadog, GrowthBook, version checks)
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+
+# Skip browser OAuth — gateway handles authentication
+export CLAUDE_CODE_OAUTH_TOKEN="gateway-managed"
+
+# Authenticate to the gateway
+export ANTHROPIC_CUSTOM_HEADERS="Proxy-Authorization: Bearer YOUR_TOKEN"
+```
+
+Or run the interactive setup script:
+
+```bash
 bash scripts/client-setup.sh
 ```
 
-### Option B: Manual
+Then start Claude Code normally — `claude` — no login prompt, traffic routes through the gateway automatically.
 
-Add to `~/.zshrc`:
+## What Gets Rewritten
 
-```bash
-export ANTHROPIC_BASE_URL="https://gateway.office.com:8443"
-export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
-export CLAUDE_CODE_OAUTH_TOKEN="gateway-managed"
-export ANTHROPIC_CUSTOM_HEADERS="Proxy-Authorization: Bearer YOUR_TOKEN_HERE"
-```
+| Layer | Field | Action |
+|-------|-------|--------|
+| **Identity** | `device_id` in metadata + events | → canonical ID |
+| | `email` | → canonical email |
+| **Environment** | `env` object (40+ fields) | → entire object replaced |
+| **Process** | `constrainedMemory` (physical RAM) | → canonical value |
+| | `rss`, `heapTotal`, `heapUsed` | → randomized in realistic range |
+| **Headers** | `User-Agent` | → canonical CC version |
+| | `Authorization` | → real OAuth token (injected by gateway) |
+| | `x-anthropic-billing-header` | → canonical fingerprint |
+| **Prompt text** | `Platform`, `Shell`, `OS Version` | → canonical values |
+| | `Working directory` | → canonical path |
+| | `/Users/xxx/`, `/home/xxx/` | → canonical home prefix |
+| **Leak fields** | `baseUrl` (ANTHROPIC_BASE_URL) | → stripped |
+| | `gateway` (provider detection) | → stripped |
 
-Then `source ~/.zshrc` and run `claude` normally. No browser login needed.
+## Clash Rules
 
-### Option C: + Clash (recommended)
-
-Add to your ClashX config (see `clash-rules.yaml`):
+Clash acts as a network-level safety net. Even if Claude Code bypasses env vars or adds new hardcoded endpoints in a future update, Clash blocks direct connections.
 
 ```yaml
 rules:
-  - DOMAIN,gateway.office.com,DIRECT
-  - DOMAIN-SUFFIX,anthropic.com,REJECT
-  - DOMAIN-SUFFIX,claude.com,REJECT
-  - DOMAIN-SUFFIX,claude.ai,REJECT
-  - DOMAIN-SUFFIX,datadoghq.com,REJECT
+  - DOMAIN,gateway.your-domain.com,DIRECT    # Allow gateway
+  - DOMAIN-SUFFIX,anthropic.com,REJECT        # Block direct API
+  - DOMAIN-SUFFIX,claude.com,REJECT           # Block OAuth
+  - DOMAIN-SUFFIX,claude.ai,REJECT            # Block OAuth
+  - DOMAIN-SUFFIX,datadoghq.com,REJECT        # Block telemetry
 ```
 
-This blocks any accidental direct connections to Anthropic as a safety net.
-
-## What gets rewritten
-
-| Field | Source | Rewrite |
-|-------|--------|---------|
-| `device_id` | `metadata.user_id` + event data | → canonical ID |
-| `email` | event data | → canonical email |
-| `env` (40+ fields) | event data | → entire object replaced |
-| `process.constrainedMemory` | event data (base64) | → canonical RAM |
-| `rss`, `heapUsed` | event data (base64) | → randomized in range |
-| `User-Agent` | HTTP header | → canonical version |
-| `x-anthropic-billing-header` | HTTP header + system prompt | → canonical fingerprint |
-| `Platform`, `Shell`, `OS Version` | system prompt `<env>` block | → canonical values |
-| `Working directory` | system prompt | → canonical path |
-| `/Users/xxx/`, `/home/xxx/` | anywhere in prompt text | → canonical home path |
-| `baseUrl` | event data (ANTHROPIC_BASE_URL leak) | → stripped |
-| `Authorization` | HTTP header | → replaced with real OAuth token |
+See [`clash-rules.yaml`](clash-rules.yaml) for the full template.
 
 ## Architecture
 
 ```
-Client env vars:
-  ANTHROPIC_BASE_URL=https://gateway:8443
-  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1  ← kills Datadog, GrowthBook, updates
-  CLAUDE_CODE_OAUTH_TOKEN=gateway-managed      ← skips browser login
-  ANTHROPIC_CUSTOM_HEADERS=Proxy-Authorization: Bearer <token>
-
-Traffic flow:
-  /v1/messages             → gateway rewrites body + headers → api.anthropic.com
-  /api/event_logging/batch → gateway rewrites all events     → api.anthropic.com
-  /api/claude_code/*       → gateway rewrites identity       → api.anthropic.com
-  platform.claude.com      → NOT contacted (OAUTH_TOKEN skips it)
-  datadoghq.com            → NOT contacted (DISABLE_NONESSENTIAL)
-  mcp-proxy.anthropic.com  → NOT contacted (don't use MCP)
+Client machines                        CC Gateway                    Anthropic
+┌────────────┐                    ┌──────────────────┐
+│  Claude Code │── ANTHROPIC_ ────│  Auth: Bearer     │
+│  + env vars  │   BASE_URL       │  OAuth: auto-     │
+│  + Clash     │                  │    refresh        │──── single ────▶ api.anthropic.com
+│  (blocks     │                  │  Rewrite: all     │     identity
+│   direct)    │                  │    identity       │
+└────────────┘                    │  Stream: SSE      │
+                                  │    passthrough    │
+                                  └──────────────────┘
+                                         │
+                                   platform.claude.com
+                                   (token refresh only,
+                                    from gateway IP)
 ```
+
+**Defense in depth:**
+
+| Layer | Mechanism | What it prevents |
+|-------|-----------|-----------------|
+| Env vars | `ANTHROPIC_BASE_URL` + `DISABLE_NONESSENTIAL` + `OAUTH_TOKEN` | CC voluntarily routes to gateway, disables side channels, skips browser login |
+| Clash | Domain-based REJECT rules | Any accidental or future direct connections to Anthropic |
+| Gateway | Body + header + prompt rewriting | All 40+ fingerprint dimensions normalized to one device |
 
 ## Caveats
 
-- **MCP**: If clients use official MCP servers, `mcp-proxy.anthropic.com` is contacted directly (hardcoded, doesn't follow `ANTHROPIC_BASE_URL`). Avoid MCP or use Clash to block it.
-- **CC updates**: When Claude Code updates, new telemetry fields or endpoints may appear. Monitor the Clash REJECT logs for unexpected connection attempts.
-- **Token expiry**: The gateway auto-refreshes the OAuth token. If the refresh token itself expires (rare), re-run `extract-token.sh` on the admin machine.
+- **MCP servers** — `mcp-proxy.anthropic.com` is hardcoded and does not follow `ANTHROPIC_BASE_URL`. If clients use official MCP servers, those requests bypass the gateway. Use Clash to block this domain if MCP is not needed.
+- **CC updates** — New Claude Code versions may introduce new telemetry fields or endpoints. Monitor Clash REJECT logs for unexpected connection attempts after upgrades.
+- **Token lifecycle** — The gateway auto-refreshes the OAuth access token. If the underlying refresh token expires (rare), re-run `extract-token.sh` on the admin machine.
+
+## References
+
+This project builds on:
+
+- [Claude Code 封号机制深度探查报告](https://bytedance.larkoffice.com/docx/E2JudVzf7oCNfhxyxaQcZIW1n0g) — Reverse-engineering analysis of Claude Code's 640+ telemetry events, 40+ fingerprint dimensions, and ban detection mechanisms
+- [instructkr/claude-code](https://github.com/instructkr/claude-code) — Deobfuscated Claude Code source used for the telemetry audit
+
+## License
+
+[MIT](LICENSE)
+
+---
+
+<div align="center">
+  <sub>Crafted with <a href="https://github.com/anthropics/claude-code">Claude Code</a></sub>
+</div>
+
+<!-- Badge references -->
+[license-shield]: https://img.shields.io/github/license/whiletrue0x/cc-gateway
+[license-url]: https://github.com/whiletrue0x/cc-gateway/blob/main/LICENSE
+[version-shield]: https://img.shields.io/badge/version-0.1.0--alpha-blue
+[version-url]: https://github.com/whiletrue0x/cc-gateway/releases
+[tests-shield]: https://img.shields.io/badge/tests-13%20passed-brightgreen
+[tests-url]: https://github.com/whiletrue0x/cc-gateway/blob/main/tests/rewriter.test.ts
