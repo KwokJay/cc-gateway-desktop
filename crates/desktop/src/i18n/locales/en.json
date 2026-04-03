@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "CC Gateway Desktop",
+    "version": "Version"
+  },
+  "status": {
+    "title": "Status",
+    "daemon": "Daemon Status",
+    "health": "Health Status",
+    "oauth": "OAuth Status",
+    "device": "Device",
+    "platform": "Platform",
+    "upstream": "Upstream URL",
+    "clients": "Clients",
+    "stopped": "Stopped",
+    "starting": "Starting...",
+    "running": "Running",
+    "stopping": "Stopping...",
+    "failed": "Failed",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "connecting": "Connecting",
+    "start": "Start Daemon",
+    "stop": "Stop Daemon",
+    "error": "Error",
+    "state": {
+      "healthy": "Healthy",
+      "warning": "Warning",
+      "danger": "Danger",
+      "unknown": "Unknown"
+    },
+    "category": {
+      "daemon": "Daemon",
+      "auth": "Authentication",
+      "identity": "Identity",
+      "upstream": "Upstream",
+      "clients": "Clients"
+    },
+    "dashboard": "Health Dashboard",
+    "items": {
+      "device": "Device ID",
+      "platform": "Platform",
+      "oauth": "OAuth Token",
+      "status": "Daemon State",
+      "upstream": "Endpoint",
+      "clients": "Active Clients"
+    }
+  },
+  "menu": {
+    "status": "Status",
+    "config": "Config",
+    "logs": "Logs",
+    "settings": "Settings",
+    "quit": "Quit"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "autostart": "Start on boot",
+    "startMinimized": "Start minimized to tray",
+    "about": "About",
+    "startupBehavior": "Startup Behavior",
+    "startupBehaviorDesc": "Configure how CC Gateway behaves when your computer starts."
+  },
+  "config": {
+    "title": "Configuration",
+    "path": "Config Path",
+    "port": "Port",
+    "upstream": "Upstream URL",
+    "deviceId": "Device ID",
+    "clients": "Clients",
+    "edit": "Edit Config",
+    "reload": "Reload",
+    "readonly": "Read-only mode. Configuration saving is not supported yet."
+  },
+  "logs": {
+    "title": "Logs",
+    "placeholder": "Log viewer is currently a placeholder. Real-time logs will be available here soon.",
+    "level": {
+      "debug": "Debug",
+      "info": "Info",
+      "warn": "Warning",
+      "error": "Error"
+    },
+    "export": "Export Logs",
+    "search": "Search Logs"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "refresh": "Refresh",
+    "loading": "Loading...",
+    "noData": "No Data"
+  }
+}

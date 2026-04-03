@@ -1,0 +1,31 @@
+[package]
+name = "ccgw-cli"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "ccgw_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ccg"
+path = "src/main.rs"
+
+[dependencies]
+ccgw-core = { path = "../core" }
+
+clap = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+url = { workspace = true }
+chrono = { workspace = true }
+dirs = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.10"

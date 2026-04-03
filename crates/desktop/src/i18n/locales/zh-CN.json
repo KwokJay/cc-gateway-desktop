@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "CC Gateway Desktop",
+    "version": "版本"
+  },
+  "status": {
+    "title": "状态",
+    "daemon": "守护进程状态",
+    "health": "健康状态",
+    "oauth": "OAuth 状态",
+    "device": "设备",
+    "platform": "平台",
+    "upstream": "上游地址",
+    "clients": "客户端",
+    "stopped": "已停止",
+    "starting": "启动中...",
+    "running": "运行中",
+    "stopping": "停止中...",
+    "failed": "失败",
+    "connected": "已连接",
+    "disconnected": "未连接",
+    "connecting": "连接中",
+    "start": "启动",
+    "stop": "停止",
+    "error": "错误",
+    "state": {
+      "healthy": "正常",
+      "warning": "警告",
+      "danger": "危险",
+      "unknown": "未知"
+    },
+    "category": {
+      "daemon": "守护进程",
+      "auth": "认证信息",
+      "identity": "身份信息",
+      "upstream": "上游服务",
+      "clients": "客户端"
+    },
+    "dashboard": "健康面板",
+    "items": {
+      "device": "设备 ID",
+      "platform": "平台",
+      "oauth": "OAuth 令牌",
+      "status": "守护进程状态",
+      "upstream": "接入点",
+      "clients": "活跃客户端"
+    }
+  },
+  "menu": {
+    "status": "状态",
+    "config": "配置",
+    "logs": "日志",
+    "settings": "设置",
+    "quit": "退出"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "autostart": "开机自启动",
+    "startMinimized": "启动时最小化到托盘",
+    "about": "关于",
+    "startupBehavior": "启动行为",
+    "startupBehaviorDesc": "配置 CC Gateway 在计算机启动时的行为。"
+  },
+  "config": {
+    "title": "配置",
+    "path": "配置路径",
+    "port": "端口",
+    "upstream": "上游地址",
+    "deviceId": "设备 ID",
+    "clients": "客户端",
+    "edit": "编辑配置",
+    "reload": "重新加载",
+    "readonly": "只读模式。当前尚不支持配置保存。"
+  },
+  "logs": {
+    "title": "日志",
+    "placeholder": "日志查看器当前为占位符。未来将在此处提供实时日志。",
+    "level": {
+      "debug": "调试",
+      "info": "信息",
+      "warn": "警告",
+      "error": "错误"
+    },
+    "export": "导出日志",
+    "search": "搜索日志"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "close": "关闭",
+    "refresh": "刷新",
+    "loading": "加载中...",
+    "noData": "无数据"
+  }
+}

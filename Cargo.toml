@@ -1,0 +1,77 @@
+[workspace.package]
+version = "0.3.0"
+edition = "2021"
+
+[workspace]
+resolver = "2"
+
+members = [
+    "crates/core",
+    "crates/daemon",
+    "crates/cli",
+    "crates/desktop/src-tauri",
+]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.36", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# HTTP client/server
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+axum = { version = "0.7", features = ["macros"] }
+hyper = { version = "1.2", features = ["full"] }
+hyper-util = "0.1"
+http = "1.1"
+http-body = "1.0"
+http-body-util = "0.1"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Tauri
+tauri = { version = "2.0.0", features = ["tray-icon"] }
+tauri-build = { version = "2.0.0" }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Regex
+regex = "1.10"
+
+# Base64
+base64 = "0.22"
+
+# URL parsing
+url = "2.5"
+
+rand = "0.8"
+sha2 = "0.10"
+
+# UUID
+dirs = "5.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
