@@ -110,6 +110,20 @@ fn build_client() -> anyhow::Result<Client> {
     Ok(builder.build()?)
 }
 
+async fn get_access_token_or_refresh(oauth: &OAuthManager) -> Option<String> {
+    if let Some(token) = oauth.get_access_token() {
+        return Some(token);
+    }
+
+    match oauth.refresh_token().await {
+        Ok(()) => oauth.get_access_token(),
+        Err(err) => {
+            error!("OAuth refresh failed: {err:#}");
+            None
+        }
+    }
+}
+
 async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
     let oauth_ok = state.oauth.get_access_token().is_some();
     let status = if oauth_ok {
@@ -182,8 +196,8 @@ async fn proxy_handler(
         );
     };
 
-    let Some(oauth_token) = state.oauth.get_access_token() else {
-        error!("No valid OAuth token available");
+    let Some(oauth_token) = get_access_token_or_refresh(&state.oauth).await else {
+        error!("No valid OAuth token available after refresh attempt");
         return json_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "OAuth token unavailable after refresh attempt",
@@ -547,6 +561,20 @@ mod tests {
     use super::*;
     use base64::Engine;
     use chrono::{Duration as ChronoDuration, Utc};
+    use std::sync::{Arc, Mutex};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    #[derive(Clone)]
+    struct MockResponse {
+        status_code: u16,
+        body: String,
+    }
+
+    #[derive(Debug, Clone)]
+    struct CapturedRequest {
+        body: String,
+    }
 
     fn test_config() -> Config {
         serde_json::from_value(json!({
@@ -861,5 +889,157 @@ mod tests {
         assert_eq!(event_env["platform"], "darwin");
         assert_eq!(event_env["arch"], "arm64");
         assert_eq!(event_env["version"], "2.1.81");
+    }
+
+    #[test]
+    fn lazily_refreshes_oauth_token_when_request_token_is_expired() {
+        tokio_test::block_on(async {
+            let (token_url, requests, _server) = spawn_mock_server(vec![MockResponse {
+                status_code: 200,
+                body: json!({
+                    "access_token": "fresh-access",
+                    "refresh_token": "rotated-refresh",
+                    "expires_in": 3600
+                })
+                .to_string(),
+            }])
+            .await;
+
+            let oauth = OAuthManager::with_client(
+                Some("expired-access".to_string()),
+                "refresh-123".to_string(),
+                Some(Utc::now() - ChronoDuration::seconds(1)),
+                token_url,
+                Client::new(),
+            );
+
+            let token = get_access_token_or_refresh(&oauth).await;
+
+            assert_eq!(token, Some("fresh-access".to_string()));
+            let requests = requests.lock().unwrap();
+            assert_eq!(requests.len(), 1);
+            let body: Value = serde_json::from_str(&requests[0].body).unwrap();
+            assert_eq!(body["grant_type"], "refresh_token");
+            assert_eq!(body["refresh_token"], "refresh-123");
+        });
+    }
+
+    #[test]
+    fn returns_none_when_lazy_oauth_refresh_fails() {
+        tokio_test::block_on(async {
+            let (token_url, requests, _server) = spawn_mock_server(vec![MockResponse {
+                status_code: 400,
+                body: json!({
+                    "error": "invalid_grant",
+                    "error_description": "Refresh token not found or invalid"
+                })
+                .to_string(),
+            }])
+            .await;
+
+            let oauth = OAuthManager::with_client(
+                Some("expired-access".to_string()),
+                "refresh-123".to_string(),
+                Some(Utc::now() - ChronoDuration::seconds(1)),
+                token_url,
+                Client::new(),
+            );
+
+            let token = get_access_token_or_refresh(&oauth).await;
+
+            assert_eq!(token, None);
+            assert_eq!(requests.lock().unwrap().len(), 1);
+        });
+    }
+
+    async fn spawn_mock_server(
+        responses: Vec<MockResponse>,
+    ) -> (
+        Url,
+        Arc<Mutex<Vec<CapturedRequest>>>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let captured_requests = Arc::new(Mutex::new(Vec::new()));
+        let captured_requests_handle = Arc::clone(&captured_requests);
+
+        let server = tokio::spawn(async move {
+            for response in responses {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let request = read_request(&mut stream).await;
+                captured_requests_handle.lock().unwrap().push(request);
+
+                let body = response.body;
+                let response_text = format!(
+                    "HTTP/1.1 {} {}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                    response.status_code,
+                    reason_phrase(response.status_code),
+                    body.len(),
+                    body,
+                );
+
+                stream.write_all(response_text.as_bytes()).await.unwrap();
+            }
+        });
+
+        (
+            Url::parse(&format!("http://{address}/v1/oauth/token")).unwrap(),
+            captured_requests,
+            server,
+        )
+    }
+
+    async fn read_request(stream: &mut tokio::net::TcpStream) -> CapturedRequest {
+        let mut buffer = Vec::new();
+        let mut chunk = [0; 1024];
+
+        loop {
+            let read = stream.read(&mut chunk).await.unwrap();
+            if read == 0 {
+                break;
+            }
+
+            buffer.extend_from_slice(&chunk[..read]);
+            if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+                break;
+            }
+        }
+
+        let header_end = buffer
+            .windows(4)
+            .position(|window| window == b"\r\n\r\n")
+            .map(|index| index + 4)
+            .unwrap();
+        let headers = String::from_utf8_lossy(&buffer[..header_end]).to_string();
+        let content_length = headers
+            .lines()
+            .find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                name.eq_ignore_ascii_case("content-length")
+                    .then(|| value.trim().parse::<usize>().ok())
+                    .flatten()
+            })
+            .unwrap_or(0);
+
+        while buffer.len() < header_end + content_length {
+            let read = stream.read(&mut chunk).await.unwrap();
+            if read == 0 {
+                break;
+            }
+            buffer.extend_from_slice(&chunk[..read]);
+        }
+
+        let body =
+            String::from_utf8_lossy(&buffer[header_end..header_end + content_length]).to_string();
+        CapturedRequest { body }
+    }
+
+    fn reason_phrase(status_code: u16) -> &'static str {
+        match status_code {
+            200 => "OK",
+            400 => "Bad Request",
+            _ => "OK",
+        }
     }
 }
