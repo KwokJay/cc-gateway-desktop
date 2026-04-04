@@ -135,24 +135,49 @@ fn tail_lines(path: &Path, limit: usize) -> Result<Vec<String>, String> {
     Ok(lines)
 }
 
+fn daemon_start_failure_message(daemon: &DaemonProcess, prefix: &str) -> String {
+    let mut message = prefix.to_string();
+
+    if let Ok(path) = daemon.log_path() {
+        if let Ok(lines) = tail_lines(&path, 20) {
+            let mut recent = lines
+                .into_iter()
+                .map(|line| line.trim().to_string())
+                .filter(|line| !line.is_empty())
+                .collect::<Vec<_>>();
+
+            if recent.len() > 6 {
+                recent = recent.split_off(recent.len() - 6);
+            }
+
+            if !recent.is_empty() {
+                message.push_str(&format!(
+                    " Recent daemon log ({}) => {}",
+                    path.display(),
+                    recent.join(" | ")
+                ));
+            }
+        }
+    }
+
+    message
+}
+
 #[tauri::command]
 pub async fn start_daemon(
     config_path: Option<String>,
     state: State<'_, DaemonState>,
 ) -> Result<(), String> {
-    {
+    let daemon = {
         let daemon = state.0.lock().unwrap();
         daemon.start(config_path)?;
-    }
+        daemon.clone()
+    };
+
+    let client = reqwest::Client::new();
 
     for _ in 0..20 {
-        let health_url = {
-            let daemon = state.0.lock().unwrap();
-            daemon.health_url()
-        };
-
-        if let Ok(url) = health_url {
-            let client = reqwest::Client::new();
+        if let Ok(url) = daemon.health_url() {
             if let Ok(response) = client.get(&url).send().await {
                 if response.status().is_success() {
                     return Ok(());
@@ -160,10 +185,20 @@ pub async fn start_daemon(
             }
         }
 
+        if let Some(code) = daemon.poll_exit()? {
+            return Err(daemon_start_failure_message(
+                &daemon,
+                &format!("Daemon exited before becoming healthy (code {code})."),
+            ));
+        }
+
         tokio::time::sleep(std::time::Duration::from_millis(250)).await;
     }
 
-    Err("Daemon started but health check did not become ready in time".to_string())
+    Err(daemon_start_failure_message(
+        &daemon,
+        "Daemon started but health check did not become ready in time.",
+    ))
 }
 
 #[tauri::command]
@@ -237,7 +272,10 @@ pub async fn set_start_minimized(start_minimized: bool) -> Result<DesktopSetting
 
 #[cfg(test)]
 mod tests {
-    use super::{read_config_snapshot, tail_lines, write_validated_config, EXAMPLE_CONFIG};
+    use super::{
+        daemon_start_failure_message, read_config_snapshot, tail_lines, write_validated_config,
+        EXAMPLE_CONFIG,
+    };
     use std::fs;
     use tempfile::TempDir;
 
@@ -325,5 +363,21 @@ logging:
         let lines = tail_lines(&path, 2).unwrap();
 
         assert_eq!(lines, vec!["three", "four"]);
+    }
+
+    #[test]
+    fn daemon_start_failure_message_includes_recent_logs() {
+        let temp_dir = TempDir::new().unwrap();
+        let log_path = temp_dir.path().join("desktop-daemon.log");
+        fs::write(&log_path, "one\ntwo\nthree\n").unwrap();
+
+        let daemon = crate::daemon::DaemonProcess::new();
+        *daemon.log_path.lock().unwrap() = Some(log_path.clone());
+
+        let message = daemon_start_failure_message(&daemon, "prefix");
+
+        assert!(message.contains("prefix"));
+        assert!(message.contains("desktop-daemon.log"));
+        assert!(message.contains("one | two | three"));
     }
 }

@@ -237,6 +237,39 @@ impl DaemonProcess {
         status.clone()
     }
 
+    pub fn poll_exit(&self) -> Result<Option<i32>, String> {
+        let mut child_guard = self.child.lock().unwrap();
+        let Some(child) = child_guard.as_mut() else {
+            return Ok(None);
+        };
+
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let code = status.code().unwrap_or(1);
+                *child_guard = None;
+                drop(child_guard);
+
+                {
+                    let mut status_guard = self.status.lock().unwrap();
+                    *status_guard = if code == 0 {
+                        DaemonStatus::Stopped
+                    } else {
+                        DaemonStatus::Failed
+                    };
+                }
+
+                {
+                    let mut port_guard = self.port.lock().unwrap();
+                    *port_guard = None;
+                }
+
+                Ok(Some(code))
+            }
+            Ok(None) => Ok(None),
+            Err(error) => Err(format!("Failed to inspect daemon process: {error}")),
+        }
+    }
+
     /// 查询 daemon 健康状态（调用 /_health 端点）
     pub async fn get_health(&self) -> Result<DaemonHealth, String> {
         let url = self.health_url()?;
