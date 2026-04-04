@@ -185,8 +185,8 @@ impl Config {
                 )));
             }
 
-            let canonical_env: EnvConfig = serde_json::from_value(serde_json::to_value(&profile.env)?)
-                .map_err(|error| {
+            let canonical_env: EnvConfig =
+                serde_json::from_value(serde_json::to_value(&profile.env)?).map_err(|error| {
                     ConfigError::Validation(format!(
                         "config: canonical profile env is invalid: {error}"
                     ))
@@ -204,8 +204,7 @@ impl Config {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        if self.identity.device_id.len() != 64
-            || self.identity.device_id.chars().all(|c| c == '0')
+        if self.identity.device_id.len() != 64 || self.identity.device_id.chars().all(|c| c == '0')
         {
             return Err(ConfigError::Validation(
                 "config: identity.device_id must be set to a real 64-char hex value. Run: npm run generate-identity"

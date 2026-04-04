@@ -57,7 +57,9 @@
     "title": "Settings",
     "language": "Language",
     "autostart": "Start on boot",
+    "autostartDesc": "Register CC Gateway as a login item so it can launch automatically.",
     "startMinimized": "Start minimized to tray",
+    "startMinimizedDesc": "Keep the window hidden when the app is launched from autostart.",
     "about": "About",
     "startupBehavior": "Startup Behavior",
     "startupBehaviorDesc": "Configure how CC Gateway behaves when your computer starts."
@@ -70,12 +72,20 @@
     "deviceId": "Device ID",
     "clients": "Clients",
     "edit": "Edit Config",
+    "open": "Open",
     "reload": "Reload",
-    "readonly": "Read-only mode. Configuration saving is not supported yet."
+    "example": "No config file exists yet. Start from the bundled example, edit it here, and save when ready.",
+    "validationError": "Validation error",
+    "saveSuccess": "Configuration saved successfully."
   },
   "logs": {
     "title": "Logs",
     "placeholder": "Log viewer is currently a placeholder. Real-time logs will be available here soon.",
+    "path": "Log file",
+    "open": "Open",
+    "empty": "No daemon logs have been captured yet. Start the daemon to populate this view.",
+    "noMatches": "No log lines match the current search.",
+    "lines": "lines",
     "level": {
       "debug": "Debug",
       "info": "Info",

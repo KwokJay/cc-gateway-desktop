@@ -175,6 +175,33 @@ async fn proxy_prefers_canonical_profile_version_and_platform() {
 }
 
 #[tokio::test]
+async fn proxy_returns_typescript_oauth_unavailable_message() {
+    let upstream = spawn_upstream().await;
+    let daemon = spawn_daemon(test_config_with_soon_expiring_oauth(&upstream.base_url)).await;
+    let client = reqwest::Client::new();
+
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+    let response = client
+        .post(format!("{}/v1/messages", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .json(&json!({
+            "messages": [{ "role": "user", "content": "hello" }],
+            "system": []
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
+    let body: Value = response.json().await.unwrap();
+    assert_eq!(
+        body["error"],
+        "OAuth token unavailable after refresh attempt"
+    );
+}
+
+#[tokio::test]
 async fn proxy_strips_sensitive_headers_and_preserves_non_json_body() {
     let upstream = spawn_upstream().await;
     let daemon = spawn_daemon(test_config(&upstream.base_url)).await;
@@ -217,6 +244,45 @@ async fn proxy_strips_sensitive_headers_and_preserves_non_json_body() {
         None
     );
     assert_eq!(String::from_utf8(captured.body).unwrap(), raw_body);
+}
+
+#[tokio::test]
+async fn proxy_rewrites_policy_limits_generic_identity_payloads() {
+    let upstream = spawn_upstream().await;
+    let daemon = spawn_daemon(test_config(&upstream.base_url)).await;
+    let client = reqwest::Client::new();
+
+    let request_body = json!({
+        "device_id": "old-device",
+        "email": "old@example.com",
+        "account_uuid": "old-account",
+        "session_id": "old-session",
+        "other_field": "preserved"
+    });
+
+    let response = client
+        .post(format!("{}/policy_limits", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .json(&request_body)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::CREATED);
+
+    let captured = wait_for_captured_request(&upstream.captured).await;
+    assert_eq!(captured.path, "/policy_limits");
+    assert_eq!(
+        header_value(&captured.headers, "x-api-key"),
+        Some("oauth-access")
+    );
+
+    let forwarded_body: Value = serde_json::from_slice(&captured.body).unwrap();
+    assert_eq!(forwarded_body["device_id"], "canonical-device-id");
+    assert_eq!(forwarded_body["email"], "canonical@example.com");
+    assert_eq!(forwarded_body["account_uuid"], "canonical-account-uuid");
+    assert_eq!(forwarded_body["session_id"], "canonical-session-id");
+    assert_eq!(forwarded_body["other_field"], "preserved");
 }
 
 fn test_config(upstream_url: &str) -> Config {
@@ -340,6 +406,12 @@ fn test_config_with_canonical_profile(upstream_url: &str) -> Config {
         process: config.process.clone(),
         rewrite_policy: None,
     });
+    config
+}
+
+fn test_config_with_soon_expiring_oauth(upstream_url: &str) -> Config {
+    let mut config = test_config(upstream_url);
+    config.oauth.expires_at = Some((Utc::now() + ChronoDuration::seconds(1)).timestamp_millis());
     config
 }
 

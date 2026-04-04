@@ -186,7 +186,7 @@ async fn proxy_handler(
         error!("No valid OAuth token available");
         return json_error(
             StatusCode::SERVICE_UNAVAILABLE,
-            "OAuth token not available - gateway is refreshing",
+            "OAuth token unavailable after refresh attempt",
         );
     };
 

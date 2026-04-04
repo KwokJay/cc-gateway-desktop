@@ -26,8 +26,8 @@ This checklist maps the TypeScript source-of-truth tests in `tests/*.ts` to the 
 - [x] Event batch env/process identity rewrites preserve canonical shape — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`, `crates/core/src/rewriter/env.rs`
 - [x] Sensitive inbound headers are stripped and user-agent is normalized — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`, `crates/core/src/rewriter/headers.rs`
 - [x] Non-JSON bodies pass through unchanged — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`
+- [x] Generic `/policy_limits` payload identity is rewritten — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`, `crates/core/src/rewriter/identity.rs`
 
 ## Watch list
 
-- [ ] Add explicit Rust integration coverage for `/settings` and `/policy_limits` payload sanitization such as `baseUrl` stripping.
-- [ ] Add explicit Rust coverage for recursive `additional_metadata` identity sanitization depth.
+- [ ] Investigate TS recursive `additional_metadata` sanitization parity: `src/rewriter.ts` uses `recursiveSanitizeIdentity(...)`, while `crates/daemon/src/server.rs` currently rewrites only top-level identity keys in decoded metadata.

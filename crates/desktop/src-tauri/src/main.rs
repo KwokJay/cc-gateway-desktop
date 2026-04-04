@@ -1,8 +1,10 @@
 mod commands;
 mod daemon;
+mod settings;
 
 use commands::DaemonState;
 use daemon::DaemonProcess;
+use settings::DesktopSettings;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{
@@ -14,8 +16,19 @@ use tauri::{
 fn main() {
     let daemon_process = Arc::new(Mutex::new(DaemonProcess::new()));
     let daemon_state = DaemonState(daemon_process.clone());
+    let launch_from_autostart = std::env::args().any(|arg| arg == "--from-autostart");
+    let launch_hidden = launch_from_autostart
+        && DesktopSettings::load()
+            .map(|settings| settings.start_minimized)
+            .unwrap_or(false);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .arg("--from-autostart")
+                .build(),
+        )
         .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             #[cfg(target_os = "macos")]
@@ -24,21 +37,9 @@ fn main() {
             }
 
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.center();
-                #[cfg(target_os = "macos")]
-                {
-                    let _ = window.set_visible_on_all_workspaces(true);
-                }
-                let _ = window.set_always_on_top(true);
-                let _ = window.set_focus();
-            }
-
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(400)).await;
-                if let Some(window) = app_handle.get_webview_window("main") {
+                if launch_hidden {
+                    let _ = window.hide();
+                } else {
                     let _ = window.show();
                     let _ = window.unminimize();
                     let _ = window.center();
@@ -48,6 +49,24 @@ fn main() {
                     }
                     let _ = window.set_always_on_top(true);
                     let _ = window.set_focus();
+                }
+            }
+
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(400)).await;
+                if !launch_hidden {
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.center();
+                        #[cfg(target_os = "macos")]
+                        {
+                            let _ = window.set_visible_on_all_workspaces(true);
+                        }
+                        let _ = window.set_always_on_top(true);
+                        let _ = window.set_focus();
+                    }
                 }
             });
 
@@ -91,6 +110,11 @@ fn main() {
             commands::stop_daemon,
             commands::get_daemon_status,
             commands::get_daemon_health,
+            commands::get_config_snapshot,
+            commands::save_config_snapshot,
+            commands::get_daemon_logs,
+            commands::get_desktop_settings,
+            commands::set_start_minimized,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

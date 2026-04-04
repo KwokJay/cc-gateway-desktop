@@ -24,8 +24,20 @@ impl AuthManager {
 
     pub fn authenticate(&self, headers: &HeaderMap) -> Option<String> {
         self.authenticate_api_key(headers)
-            .or_else(|| self.authenticate_bearer(headers, "proxy-authorization"))
-            .or_else(|| self.authenticate_bearer(headers, "authorization"))
+            .or_else(|| self.authenticate_bearer_with_typescript_precedence(headers))
+    }
+
+    fn authenticate_bearer_with_typescript_precedence(
+        &self,
+        headers: &HeaderMap,
+    ) -> Option<String> {
+        let header_name = if headers.contains_key("proxy-authorization") {
+            "proxy-authorization"
+        } else {
+            "authorization"
+        };
+
+        self.authenticate_bearer(headers, header_name)
     }
 
     fn authenticate_api_key(&self, headers: &HeaderMap) -> Option<String> {
@@ -113,6 +125,19 @@ mod tests {
         headers.insert("authorization", HeaderValue::from_static("Bearer token456"));
 
         assert_eq!(auth.authenticate(&headers), Some("bob".to_string()));
+    }
+
+    #[test]
+    fn does_not_fallback_when_proxy_authorization_is_invalid() {
+        let auth = build_auth_manager();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "proxy-authorization",
+            HeaderValue::from_static("Bearer invalid-token"),
+        );
+        headers.insert("authorization", HeaderValue::from_static("Bearer token456"));
+
+        assert_eq!(auth.authenticate(&headers), None);
     }
 
     #[test]

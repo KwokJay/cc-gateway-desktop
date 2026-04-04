@@ -57,7 +57,9 @@
     "title": "设置",
     "language": "语言",
     "autostart": "开机自启动",
+    "autostartDesc": "将 CC Gateway 注册为登录项，以便系统启动时自动运行。",
     "startMinimized": "启动时最小化到托盘",
+    "startMinimizedDesc": "通过自启动启动时保持窗口隐藏，仅显示托盘图标。",
     "about": "关于",
     "startupBehavior": "启动行为",
     "startupBehaviorDesc": "配置 CC Gateway 在计算机启动时的行为。"
@@ -70,12 +72,20 @@
     "deviceId": "设备 ID",
     "clients": "客户端",
     "edit": "编辑配置",
+    "open": "打开",
     "reload": "重新加载",
-    "readonly": "只读模式。当前尚不支持配置保存。"
+    "example": "当前还没有配置文件。你可以从内置示例开始，在这里编辑后保存。",
+    "validationError": "校验错误",
+    "saveSuccess": "配置已成功保存。"
   },
   "logs": {
     "title": "日志",
     "placeholder": "日志查看器当前为占位符。未来将在此处提供实时日志。",
+    "path": "日志文件",
+    "open": "打开",
+    "empty": "当前还没有守护进程日志。启动守护进程后会在这里显示。",
+    "noMatches": "没有匹配当前搜索条件的日志行。",
+    "lines": "行",
     "level": {
       "debug": "调试",
       "info": "信息",

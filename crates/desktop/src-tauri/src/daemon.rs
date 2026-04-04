@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 
 /// Daemon 进程状态
@@ -32,6 +34,7 @@ pub struct DaemonProcess {
     pub child: Arc<Mutex<Option<Child>>>,
     pub config_path: Arc<Mutex<Option<PathBuf>>>,
     pub port: Arc<Mutex<Option<u16>>>,
+    pub log_path: Arc<Mutex<Option<PathBuf>>>,
 }
 
 impl DaemonProcess {
@@ -41,7 +44,13 @@ impl DaemonProcess {
             child: Arc::new(Mutex::new(None)),
             config_path: Arc::new(Mutex::new(None)),
             port: Arc::new(Mutex::new(None)),
+            log_path: Arc::new(Mutex::new(None)),
         }
+    }
+
+    pub fn default_config_path() -> Result<PathBuf, String> {
+        let home = dirs::home_dir().ok_or_else(|| "Cannot determine home directory".to_string())?;
+        Ok(home.join(".ccgw").join("config.yaml"))
     }
 
     /// 解析配置路径（显式或默认）
@@ -55,8 +64,7 @@ impl DaemonProcess {
         }
 
         // 默认路径：~/.ccgw/config.yaml
-        let home = dirs::home_dir().ok_or_else(|| "Cannot determine home directory")?;
-        let default_path = home.join(".ccgw").join("config.yaml");
+        let default_path = Self::default_config_path()?;
         if !default_path.exists() {
             return Err(format!(
                 "Default config not found: {}",
@@ -87,6 +95,19 @@ impl DaemonProcess {
         Ok(config.server.port)
     }
 
+    pub fn default_log_path() -> Result<PathBuf, String> {
+        let home = dirs::home_dir().ok_or_else(|| "Cannot determine home directory".to_string())?;
+        Ok(home.join(".ccgw").join("logs").join("desktop-daemon.log"))
+    }
+
+    pub fn log_path(&self) -> Result<PathBuf, String> {
+        if let Some(path) = self.log_path.lock().unwrap().clone() {
+            return Ok(path);
+        }
+
+        Self::default_log_path()
+    }
+
     /// 启动 daemon 子进程
     pub fn start(&self, config_path_str: Option<String>) -> Result<(), String> {
         let mut status = self.status.lock().unwrap();
@@ -96,20 +117,52 @@ impl DaemonProcess {
         *status = DaemonStatus::Starting;
         drop(status);
 
-        let start_result: Result<(PathBuf, u16, Child), String> = (|| {
+        let start_result: Result<(PathBuf, u16, PathBuf, Child), String> = (|| {
             let config_path = Self::resolve_config_path(config_path_str)?;
             let port = Self::read_port_from_config(&config_path)?;
             let daemon_binary = Self::find_daemon_binary()?;
+            let log_path = Self::default_log_path()?;
+
+            if let Some(parent) = log_path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|error| format!("Failed to create log directory: {error}"))?;
+            }
+
+            let mut header_file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_path)
+                .map_err(|error| format!("Failed to open log file: {error}"))?;
+            writeln!(
+                header_file,
+                "\n===== desktop session started: pid={} config={} =====",
+                std::process::id(),
+                config_path.display()
+            )
+            .map_err(|error| format!("Failed to write log header: {error}"))?;
+
+            let stdout = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_path)
+                .map_err(|error| format!("Failed to open daemon stdout log file: {error}"))?;
+            let stderr = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_path)
+                .map_err(|error| format!("Failed to open daemon stderr log file: {error}"))?;
 
             let child = Command::new(&daemon_binary)
                 .arg(&config_path)
+                .stdout(Stdio::from(stdout))
+                .stderr(Stdio::from(stderr))
                 .spawn()
                 .map_err(|e| format!("Failed to spawn daemon: {}", e))?;
 
-            Ok((config_path, port, child))
+            Ok((config_path, port, log_path, child))
         })();
 
-        let (config_path, port, child) = match start_result {
+        let (config_path, port, log_path, child) = match start_result {
             Ok(values) => values,
             Err(err) => {
                 let mut status = self.status.lock().unwrap();
@@ -131,6 +184,11 @@ impl DaemonProcess {
         {
             let mut port_guard = self.port.lock().unwrap();
             *port_guard = Some(port);
+        }
+
+        {
+            let mut log_guard = self.log_path.lock().unwrap();
+            *log_guard = Some(log_path);
         }
 
         {
@@ -239,7 +297,7 @@ auth:
     - name: "test"
       token: "test123"
 identity:
-  device_id: "test_device"
+  device_id: "d1a2b3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0"
   email: "test@example.com"
   account_uuid: "test-account-uuid"
   session_id: "test-session-id"
@@ -307,6 +365,16 @@ logging:
     }
 
     #[test]
+    fn test_default_paths_have_expected_suffixes() {
+        assert!(DaemonProcess::default_config_path()
+            .unwrap()
+            .ends_with(".ccgw/config.yaml"));
+        assert!(DaemonProcess::default_log_path()
+            .unwrap()
+            .ends_with(".ccgw/logs/desktop-daemon.log"));
+    }
+
+    #[test]
     fn test_initial_status() {
         let daemon = DaemonProcess::new();
         assert_eq!(daemon.get_status(), DaemonStatus::Stopped);
@@ -340,6 +408,10 @@ logging:
 
     #[tokio::test]
     async fn test_start_health_stop_with_real_daemon_binary() {
+        if DaemonProcess::find_daemon_binary().is_err() {
+            return;
+        }
+
         let temp_dir = TempDir::new().unwrap();
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
