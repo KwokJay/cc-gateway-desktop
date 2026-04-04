@@ -6,6 +6,7 @@ use axum::http::{HeaderMap, Request};
 use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::{Json, Router};
+use base64::Engine;
 use ccgw_core::Config;
 use ccgw_daemon::build_app;
 use chrono::{Duration as ChronoDuration, Utc};
@@ -283,6 +284,109 @@ async fn proxy_rewrites_policy_limits_generic_identity_payloads() {
     assert_eq!(forwarded_body["account_uuid"], "canonical-account-uuid");
     assert_eq!(forwarded_body["session_id"], "canonical-session-id");
     assert_eq!(forwarded_body["other_field"], "preserved");
+}
+
+#[tokio::test]
+async fn proxy_rewrites_settings_generic_identity_payloads() {
+    let upstream = spawn_upstream().await;
+    let daemon = spawn_daemon(test_config(&upstream.base_url)).await;
+    let client = reqwest::Client::new();
+
+    let request_body = json!({
+        "device_id": "old-device",
+        "email": "old@example.com",
+        "account_uuid": "old-account",
+        "session_id": "old-session",
+        "other_field": "preserved"
+    });
+
+    let response = client
+        .post(format!("{}/settings", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .json(&request_body)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::CREATED);
+
+    let captured = wait_for_captured_request(&upstream.captured).await;
+    assert_eq!(captured.path, "/settings");
+
+    let forwarded_body: Value = serde_json::from_slice(&captured.body).unwrap();
+    assert_eq!(forwarded_body["device_id"], "canonical-device-id");
+    assert_eq!(forwarded_body["email"], "canonical@example.com");
+    assert_eq!(forwarded_body["account_uuid"], "canonical-account-uuid");
+    assert_eq!(forwarded_body["session_id"], "canonical-session-id");
+    assert_eq!(forwarded_body["other_field"], "preserved");
+}
+
+#[tokio::test]
+async fn proxy_recursively_sanitizes_identity_fields_in_additional_metadata() {
+    let upstream = spawn_upstream().await;
+    let daemon = spawn_daemon(test_config(&upstream.base_url)).await;
+    let client = reqwest::Client::new();
+
+    let metadata = json!({
+        "baseUrl": "https://gateway.example",
+        "user": {
+            "device_id": "old-device",
+            "email": "old@example.com",
+            "account_uuid": "old-account",
+            "session_id": "old-session"
+        },
+        "nested": {
+            "deeper": {
+                "device_id": "nested-device",
+                "account_uuid": "nested-account"
+            }
+        }
+    });
+
+    let response = client
+        .post(format!("{}/api/event_logging/batch", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .json(&json!({
+            "events": [{
+                "event_type": "ClaudeCodeInternalEvent",
+                "event_data": {
+                    "device_id": "top-level",
+                    "additional_metadata": base64::engine::general_purpose::STANDARD
+                        .encode(metadata.to_string())
+                }
+            }]
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::CREATED);
+
+    let captured = wait_for_captured_request(&upstream.captured).await;
+    let forwarded_body: Value = serde_json::from_slice(&captured.body).unwrap();
+    let encoded = forwarded_body["events"][0]["event_data"]["additional_metadata"]
+        .as_str()
+        .unwrap();
+    let decoded: Value = serde_json::from_slice(
+        &base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(decoded["baseUrl"], Value::Null);
+    assert_eq!(decoded["user"]["device_id"], "canonical-device-id");
+    assert_eq!(decoded["user"]["email"], "canonical@example.com");
+    assert_eq!(decoded["user"]["account_uuid"], "canonical-account-uuid");
+    assert_eq!(decoded["user"]["session_id"], "canonical-session-id");
+    assert_eq!(
+        decoded["nested"]["deeper"]["device_id"],
+        "canonical-device-id"
+    );
+    assert_eq!(
+        decoded["nested"]["deeper"]["account_uuid"],
+        "canonical-account-uuid"
+    );
 }
 
 fn test_config(upstream_url: &str) -> Config {

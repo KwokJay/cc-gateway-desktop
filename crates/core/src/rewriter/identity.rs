@@ -76,6 +76,47 @@ pub fn rewrite_generic_identity(body: &mut Value, identity: &IdentityConfig) {
     rewrite_event_identity(body, identity);
 }
 
+pub fn rewrite_recursive_identity(value: &mut Value, identity: &IdentityConfig) {
+    match value {
+        Value::Object(object) => {
+            if object.contains_key("device_id") {
+                object.insert(
+                    "device_id".to_string(),
+                    Value::String(identity.device_id.clone()),
+                );
+            }
+
+            if object.contains_key("email") {
+                object.insert("email".to_string(), Value::String(identity.email.clone()));
+            }
+
+            if object.contains_key("account_uuid") {
+                object.insert(
+                    "account_uuid".to_string(),
+                    Value::String(identity.account_uuid.clone()),
+                );
+            }
+
+            if object.contains_key("session_id") {
+                object.insert(
+                    "session_id".to_string(),
+                    Value::String(identity.session_id.clone()),
+                );
+            }
+
+            for nested in object.values_mut() {
+                rewrite_recursive_identity(nested, identity);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                rewrite_recursive_identity(item, identity);
+            }
+        }
+        _ => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +201,43 @@ mod tests {
         assert_eq!(body["device_id"], identity.device_id);
         assert_eq!(body["email"], identity.email);
         assert_eq!(body["feature_flag"], true);
+    }
+
+    #[test]
+    fn rewrites_recursive_identity_fields() {
+        let identity = identity_config();
+        let mut metadata = json!({
+            "user": {
+                "device_id": "old_device",
+                "email": "old@example.com",
+                "account_uuid": "old-acct",
+                "session_id": "old-sess"
+            },
+            "nested": {
+                "deeper": {
+                    "device_id": "nested-device",
+                    "account_uuid": "nested-acct"
+                }
+            },
+            "items": [
+                { "session_id": "item-session" }
+            ]
+        });
+
+        rewrite_recursive_identity(&mut metadata, &identity);
+
+        assert_eq!(metadata["user"]["device_id"], identity.device_id);
+        assert_eq!(metadata["user"]["email"], identity.email);
+        assert_eq!(metadata["user"]["account_uuid"], identity.account_uuid);
+        assert_eq!(metadata["user"]["session_id"], identity.session_id);
+        assert_eq!(
+            metadata["nested"]["deeper"]["device_id"],
+            identity.device_id
+        );
+        assert_eq!(
+            metadata["nested"]["deeper"]["account_uuid"],
+            identity.account_uuid
+        );
+        assert_eq!(metadata["items"][0]["session_id"], identity.session_id);
     }
 }

@@ -10,8 +10,8 @@ use axum::{Json, Router};
 use base64::Engine;
 use ccgw_core::{
     rewrite_event_env, rewrite_event_identity, rewrite_event_process, rewrite_generic_identity,
-    rewrite_headers, rewrite_messages_metadata, rewrite_prompt_text, rewrite_system_reminders,
-    AuthManager, Config, OAuthManager,
+    rewrite_headers, rewrite_messages_metadata, rewrite_prompt_text, rewrite_recursive_identity,
+    rewrite_system_reminders, AuthManager, Config, OAuthManager,
 };
 use reqwest::{Client, Proxy};
 use serde_json::{json, Value};
@@ -451,38 +451,13 @@ fn rewrite_additional_metadata(value: &mut Value, identity: &ccgw_core::config::
         return;
     };
 
-    let Some(object) = metadata.as_object_mut() else {
-        return;
-    };
-
-    object.remove("baseUrl");
-    object.remove("base_url");
-    object.remove("gateway");
-
-    if object.contains_key("device_id") {
-        object.insert(
-            "device_id".to_string(),
-            Value::String(identity.device_id.clone()),
-        );
+    if let Some(object) = metadata.as_object_mut() {
+        object.remove("baseUrl");
+        object.remove("base_url");
+        object.remove("gateway");
     }
 
-    if object.contains_key("email") {
-        object.insert("email".to_string(), Value::String(identity.email.clone()));
-    }
-
-    if object.contains_key("account_uuid") {
-        object.insert(
-            "account_uuid".to_string(),
-            Value::String(identity.account_uuid.clone()),
-        );
-    }
-
-    if object.contains_key("session_id") {
-        object.insert(
-            "session_id".to_string(),
-            Value::String(identity.session_id.clone()),
-        );
-    }
+    rewrite_recursive_identity(&mut metadata, identity);
 
     if let Ok(encoded) = serde_json::to_vec(&metadata)
         .map(|value| base64::engine::general_purpose::STANDARD.encode(value))

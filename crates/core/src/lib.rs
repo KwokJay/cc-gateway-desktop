@@ -17,6 +17,7 @@ pub use rewriter::env::{
 pub use rewriter::headers::rewrite_headers;
 pub use rewriter::identity::{
     rewrite_event_identity, rewrite_generic_identity, rewrite_messages_metadata,
+    rewrite_recursive_identity,
 };
 pub use rewriter::prompt::{
     compute_cch, rewrite_prompt_text, rewrite_system_reminders, strip_billing_header,
