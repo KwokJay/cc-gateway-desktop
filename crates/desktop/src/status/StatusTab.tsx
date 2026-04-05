@@ -1,24 +1,38 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Power, RefreshCw, Activity, Shield, Network, Server, User, LayoutGrid } from 'lucide-react';
+import { Power, RefreshCw, Activity, Shield, Network, Server, User, LayoutGrid, TerminalSquare, Cpu, KeyRound, Rocket, EyeOff } from 'lucide-react';
 import { DaemonStatus, DaemonHealth } from '../App';
+import type { ConfigSnapshot, DesktopSettings } from '../api';
 import { useHealthDashboard } from './useHealthDashboard';
 import { StateMarker } from './StateMarker';
 
 interface StatusTabProps {
   status: DaemonStatus;
   health: DaemonHealth | null;
+  config: ConfigSnapshot | null;
+  settings: DesktopSettings | null;
+  autostartEnabled: boolean;
   loading: boolean;
   error: string | null;
   onToggle: () => void;
   onRefresh: () => void;
 }
 
-export function StatusTab({ status, health, loading, error, onToggle, onRefresh }: StatusTabProps) {
+export function StatusTab({
+  status,
+  health,
+  config,
+  settings,
+  autostartEnabled,
+  loading,
+  error,
+  onToggle,
+  onRefresh,
+}: StatusTabProps) {
   const { t } = useTranslation();
-  const categories = useHealthDashboard(status, health);
+  const categories = useHealthDashboard(status, health, config, settings, autostartEnabled);
   
-  const [selectedId, setSelectedId] = useState<string>('daemon');
+  const [selectedId, setSelectedId] = useState<string>('identityRewrite');
 
   // Auto-select the first danger category if present
   useEffect(() => {
@@ -105,7 +119,12 @@ export function StatusTab({ status, health, loading, error, onToggle, onRefresh 
           <div className="flex justify-between items-center mb-8 pb-4 border-b border-slate-100">
             <div className="flex items-center space-x-3">
               {getCategoryIcon(selectedCategory.id, true)}
-              <h3 className="text-xl font-medium text-slate-900">{selectedCategory.label}</h3>
+              <div>
+                <h3 className="text-xl font-medium text-slate-900">{selectedCategory.label}</h3>
+                {selectedCategory.description && (
+                  <p className="mt-2 max-w-2xl text-sm text-slate-500">{selectedCategory.description}</p>
+                )}
+              </div>
             </div>
             <StateMarker state={selectedCategory.overallState} />
           </div>
@@ -132,11 +151,16 @@ export function StatusTab({ status, health, loading, error, onToggle, onRefresh 
 function getCategoryIcon(id: string, active: boolean) {
   const className = `w-5 h-5 ${active ? 'text-slate-900' : 'text-slate-400'}`;
   switch (id) {
-    case 'daemon': return <Server className={className} />;
-    case 'auth': return <Shield className={className} />;
-    case 'identity': return <User className={className} />;
-    case 'upstream': return <Network className={className} />;
-    case 'clients': return <Activity className={className} />;
+    case 'identityRewrite': return <User className={className} />;
+    case 'envRewrite': return <TerminalSquare className={className} />;
+    case 'promptSanitization': return <Server className={className} />;
+    case 'billingHeader': return <Shield className={className} />;
+    case 'processMetrics': return <Cpu className={className} />;
+    case 'zeroLoginClients': return <LayoutGrid className={className} />;
+    case 'centralizedOAuth': return <KeyRound className={className} />;
+    case 'instantStartup': return <Rocket className={className} />;
+    case 'proxyAware': return <Network className={className} />;
+    case 'telemetryLeakPrevention': return <EyeOff className={className} />;
     default: return <Activity className={className} />;
   }
 }

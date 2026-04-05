@@ -1,5 +1,6 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ConfigSnapshot, DesktopSettings } from '../api';
 import { HealthCategory, HealthState } from './types';
 import { notifyDanger } from './notifications';
 
@@ -14,29 +15,24 @@ export interface DaemonHealth {
   clients: string[];
 }
 
-const getDaemonState = (status: DaemonStatus): HealthState => {
-  if (status === 'running') return 'healthy';
-  if (status === 'failed') return 'danger';
-  if (status === 'starting' || status === 'stopping') return 'warning';
-  return 'warning'; // stopped
-};
-
 const getOauthState = (oauth: string | undefined): HealthState => {
   if (!oauth) return 'unknown';
   const lower = oauth.toLowerCase();
-  if (lower.includes('error') || lower.includes('invalid') || lower.includes('expired') || lower.includes('fail')) return 'danger';
-  if (lower.includes('valid') || lower.includes('ok') || lower.includes('active') || lower.includes('verified')) return 'healthy';
-  return 'healthy'; // default assume healthy if exists
+  if (lower.includes('invalid') || lower.includes('error') || lower.includes('fail')) return 'danger';
+  if (lower.includes('expired') || lower.includes('refresh')) return 'warning';
+  if (lower.includes('valid') || lower.includes('ok')) return 'healthy';
+  return 'unknown';
 };
 
-const getGeneralState = (val: string | undefined): HealthState => {
-  if (!val) return 'unknown';
-  const lower = val.toLowerCase();
-  if (lower.includes('error') || lower.includes('fail') || lower.includes('down')) return 'danger';
-  return 'healthy';
-};
+const getConfiguredState = (configured: boolean): HealthState => (configured ? 'healthy' : 'warning');
 
-export const useHealthDashboard = (status: DaemonStatus, health: DaemonHealth | null) => {
+export const useHealthDashboard = (
+  status: DaemonStatus,
+  health: DaemonHealth | null,
+  config: ConfigSnapshot | null,
+  settings: DesktopSettings | null,
+  autostartEnabled: boolean,
+) => {
   const { t } = useTranslation();
   const notifiedDanger = useRef<string | null>(null);
   const hasObservedRunning = useRef<boolean>(false);
@@ -46,107 +42,201 @@ export const useHealthDashboard = (status: DaemonStatus, health: DaemonHealth | 
   }
 
   const categories = useMemo<HealthCategory[]>(() => {
-    const isRunning = status === 'running';
+    const summary = config?.summary;
+    const configValid = !!summary && !config?.validationError;
+    const oauthState = status === 'running' ? getOauthState(health?.oauth) : 'unknown';
+    const boolText = (value: boolean | null | undefined) => {
+      if (value === null || value === undefined) return t('status.state.unknown');
+      return value ? t('common.yes') : t('common.no');
+    };
+    const dateText = (value: number | null | undefined) =>
+      value ? new Date(value).toLocaleString() : t('common.noData');
+    const rangeText = (range?: [number, number]) =>
+      range ? `${range[0].toLocaleString()} - ${range[1].toLocaleString()}` : t('common.noData');
+    const fallback = t('common.noData');
 
-    const daemonState = getDaemonState(status);
-    const daemonCategory: HealthCategory = {
-      id: 'daemon',
-      label: t('status.category.daemon'),
-      overallState: daemonState,
+    const identityRewrite: HealthCategory = {
+      id: 'identityRewrite',
+      label: t('status.category.identityRewrite'),
+      description: t('status.categoryDescription.identityRewrite'),
+      overallState: configValid ? 'healthy' : config?.validationError ? 'danger' : 'unknown',
       items: [
-        {
-          id: 'daemon_status',
-          label: t('status.items.status'),
-          value: t(`status.${status}`),
-          state: daemonState,
-        }
-      ]
+        { id: 'identity_device', label: t('status.items.device'), value: summary?.identity.deviceId ?? fallback, state: summary?.identity.deviceId ? 'healthy' : 'unknown' },
+        { id: 'identity_email', label: t('status.items.email'), value: summary?.identity.email ?? fallback, state: summary?.identity.email ? 'healthy' : 'unknown' },
+        { id: 'identity_account', label: t('status.items.accountUuid'), value: summary?.identity.accountUuid ?? fallback, state: summary?.identity.accountUuid ? 'healthy' : 'warning' },
+        { id: 'identity_session', label: t('status.items.sessionId'), value: summary?.identity.sessionId ?? fallback, state: summary?.identity.sessionId ? 'healthy' : 'warning' },
+        { id: 'identity_userid', label: t('status.items.userIdRewrite'), value: t('status.values.enabled'), state: 'healthy' },
+        { id: 'identity_generic', label: t('status.items.genericIdentityRewrite'), value: t('status.values.enabled'), state: 'healthy' },
+      ],
     };
 
-    const authState = isRunning ? getOauthState(health?.oauth) : 'unknown';
-    const authCategory: HealthCategory = {
-      id: 'auth',
-      label: t('status.category.auth'),
-      overallState: authState,
+    const ciFlags = summary?.env.ciFlags;
+    const envRewrite: HealthCategory = {
+      id: 'envRewrite',
+      label: t('status.category.envRewrite'),
+      description: t('status.categoryDescription.envRewrite'),
+      overallState: !summary
+        ? 'unknown'
+        : summary.env.keyCount >= 40
+          ? 'healthy'
+          : summary.env.keyCount >= 20
+            ? 'warning'
+            : 'danger',
       items: [
-        {
-          id: 'oauth_token',
-          label: t('status.items.oauth'),
-          value: isRunning ? (health?.oauth || t('common.noData')) : t('status.state.unknown'),
-          state: authState,
-        }
-      ]
+        { id: 'env_source', label: t('status.items.envSource'), value: summary?.env.source ?? fallback, state: summary?.env.source === 'canonical-profile' ? 'healthy' : summary ? 'warning' : 'unknown' },
+        { id: 'env_count', label: t('status.items.envKeyCount'), value: summary ? String(summary.env.keyCount) : fallback, state: summary ? (summary.env.keyCount >= 40 ? 'healthy' : 'warning') : 'unknown' },
+        { id: 'env_platform', label: t('status.items.platform'), value: summary?.env.platform ?? fallback, state: summary?.env.platform ? 'healthy' : 'unknown' },
+        { id: 'env_platform_raw', label: t('status.items.platformRaw'), value: summary?.env.platformRaw ?? fallback, state: summary?.env.platformRaw ? 'healthy' : 'unknown' },
+        { id: 'env_arch', label: t('status.items.arch'), value: summary?.env.arch ?? fallback, state: summary?.env.arch ? 'healthy' : 'unknown' },
+        { id: 'env_node', label: t('status.items.nodeVersion'), value: summary?.env.nodeVersion ?? fallback, state: summary?.env.nodeVersion ? 'healthy' : 'unknown' },
+        { id: 'env_terminal', label: t('status.items.terminal'), value: summary?.env.terminal ?? fallback, state: summary?.env.terminal ? 'healthy' : 'unknown' },
+        { id: 'env_pkg', label: t('status.items.packageManagers'), value: summary?.env.packageManagers ?? fallback, state: summary?.env.packageManagers ? 'healthy' : 'unknown' },
+        { id: 'env_runtimes', label: t('status.items.runtimes'), value: summary?.env.runtimes ?? fallback, state: summary?.env.runtimes ? 'healthy' : 'unknown' },
+        { id: 'env_ci', label: t('status.items.ciFlags'), value: ciFlags ? [`isCi=${ciFlags.isCi}`, `isClaubbit=${ciFlags.isClaubbit}`, `isClaudeCodeRemote=${ciFlags.isClaudeCodeRemote}`, `isLocalAgentMode=${ciFlags.isLocalAgentMode}`, `isConductor=${ciFlags.isConductor}`, `isGithubAction=${ciFlags.isGithubAction}`, `isClaudeCodeAction=${ciFlags.isClaudeCodeAction}`].join(', ') : fallback, state: ciFlags ? 'healthy' : 'unknown' },
+        { id: 'env_deploy', label: t('status.items.deploymentEnvironment'), value: summary?.env.deploymentEnvironment ?? fallback, state: summary?.env.deploymentEnvironment ? 'healthy' : 'unknown' },
+        { id: 'env_version', label: t('status.items.ccVersion'), value: summary?.env.version ?? fallback, state: summary?.env.version ? 'healthy' : 'unknown' },
+      ],
     };
 
-    const identityState = isRunning ? (health?.canonical_device ? 'healthy' : 'warning') : 'unknown';
-    const identityCategory: HealthCategory = {
-      id: 'identity',
-      label: t('status.category.identity'),
-      overallState: identityState,
+    const promptSanitization: HealthCategory = {
+      id: 'promptSanitization',
+      label: t('status.category.promptSanitization'),
+      description: t('status.categoryDescription.promptSanitization'),
+      overallState: summary?.promptEnv.workingDir ? 'healthy' : 'unknown',
       items: [
-        {
-          id: 'device_id',
-          label: t('status.items.device'),
-          value: isRunning ? (health?.canonical_device || t('common.noData')) : t('status.state.unknown'),
-          state: isRunning && health?.canonical_device ? 'healthy' : 'unknown',
-        },
-        {
-          id: 'platform',
-          label: t('status.items.platform'),
-          value: isRunning ? (health?.canonical_platform || t('common.noData')) : t('status.state.unknown'),
-          state: isRunning && health?.canonical_platform ? 'healthy' : 'unknown',
-        }
-      ]
+        { id: 'prompt_platform', label: t('status.items.platform'), value: summary?.promptEnv.platform ?? fallback, state: summary?.promptEnv.platform ? 'healthy' : 'unknown' },
+        { id: 'prompt_shell', label: t('status.items.shell'), value: summary?.promptEnv.shell ?? fallback, state: summary?.promptEnv.shell ? 'healthy' : 'unknown' },
+        { id: 'prompt_os', label: t('status.items.osVersion'), value: summary?.promptEnv.osVersion ?? fallback, state: summary?.promptEnv.osVersion ? 'healthy' : 'unknown' },
+        { id: 'prompt_dir', label: t('status.items.workingDirectory'), value: summary?.promptEnv.workingDir ?? fallback, state: summary?.promptEnv.workingDir ? 'healthy' : 'unknown' },
+        { id: 'prompt_env_block', label: t('status.items.envBlockRewrite'), value: t('status.values.enabled'), state: 'healthy' },
+      ],
     };
 
-    const upstreamVal = health?.upstream;
-    const upstreamItemState = isRunning ? getGeneralState(upstreamVal) : 'unknown';
-    const upstreamCategory: HealthCategory = {
-      id: 'upstream',
-      label: t('status.category.upstream'),
-      overallState: upstreamItemState,
+    const billingHeader: HealthCategory = {
+      id: 'billingHeader',
+      label: t('status.category.billingHeader'),
+      description: t('status.categoryDescription.billingHeader'),
+      overallState: 'healthy',
       items: [
-        {
-          id: 'upstream_endpoint',
-          label: t('status.items.upstream'),
-          value: isRunning ? (upstreamVal || t('common.noData')) : t('status.state.unknown'),
-          state: upstreamItemState,
-        }
-      ]
+        { id: 'billing_strip', label: t('status.items.billingHeader'), value: t('status.values.stripped'), state: 'healthy' },
+        { id: 'billing_user_agent', label: t('status.items.userAgentVersion'), value: summary?.env.version ?? fallback, state: summary?.env.version ? 'healthy' : 'unknown' },
+        { id: 'billing_cache', label: t('status.items.promptCacheSharing'), value: t('status.values.enabled'), state: 'healthy' },
+      ],
     };
 
-    const clientsState = isRunning ? 'healthy' : 'unknown';
-    const clientsVal = health?.clients;
-    const clientsCategory: HealthCategory = {
-      id: 'clients',
-      label: t('status.category.clients'),
-      overallState: clientsState,
+    const processMetrics: HealthCategory = {
+      id: 'processMetrics',
+      label: t('status.category.processMetrics'),
+      description: t('status.categoryDescription.processMetrics'),
+      overallState: summary?.process.constrainedMemory ? 'healthy' : 'unknown',
       items: [
-        {
-          id: 'active_clients',
-          label: t('status.items.clients'),
-          value: isRunning ? (clientsVal && clientsVal.length > 0 ? clientsVal.join(', ') : '0') : t('status.state.unknown'),
-          state: clientsState,
-        }
-      ]
+        { id: 'process_memory', label: t('status.items.constrainedMemory'), value: summary ? summary.process.constrainedMemory.toLocaleString() : fallback, state: summary?.process.constrainedMemory ? 'healthy' : 'unknown' },
+        { id: 'process_rss', label: t('status.items.rssRange'), value: summary ? rangeText(summary.process.rssRange) : fallback, state: summary?.process.rssRange ? 'healthy' : 'unknown' },
+        { id: 'process_heap_total', label: t('status.items.heapTotalRange'), value: summary ? rangeText(summary.process.heapTotalRange) : fallback, state: summary?.process.heapTotalRange ? 'healthy' : 'unknown' },
+        { id: 'process_heap_used', label: t('status.items.heapUsedRange'), value: summary ? rangeText(summary.process.heapUsedRange) : fallback, state: summary?.process.heapUsedRange ? 'healthy' : 'unknown' },
+      ],
     };
 
-    return [daemonCategory, authCategory, identityCategory, upstreamCategory, clientsCategory];
-  }, [status, health, t]);
+    const zeroLoginClients: HealthCategory = {
+      id: 'zeroLoginClients',
+      label: t('status.category.zeroLoginClients'),
+      description: t('status.categoryDescription.zeroLoginClients'),
+      overallState: summary ? getConfiguredState(summary.clients.length > 0) : 'unknown',
+      items: [
+        { id: 'clients_list', label: t('status.items.clients'), value: summary?.clients.join(', ') || fallback, state: summary?.clients.length ? 'healthy' : 'warning' },
+        { id: 'clients_count', label: t('status.items.clientCount'), value: summary ? String(summary.clients.length) : fallback, state: summary?.clients.length ? 'healthy' : 'warning' },
+        { id: 'clients_launcher', label: t('status.items.launcherPath'), value: summary?.launcher.path ?? fallback, state: summary?.launcher.available ? 'healthy' : 'warning' },
+        { id: 'clients_autostart', label: t('settings.autostart'), value: boolText(autostartEnabled), state: autostartEnabled ? 'healthy' : 'unknown' },
+        { id: 'clients_minimized', label: t('settings.startMinimized'), value: boolText(settings?.startMinimized), state: settings ? 'healthy' : 'unknown' },
+        { id: 'clients_browser', label: t('status.items.browserOauthRequired'), value: t('common.no'), state: 'healthy' },
+        { id: 'clients_shell_rc', label: t('status.items.shellRcRequired'), value: t('common.no'), state: 'healthy' },
+        { id: 'clients_local_config', label: t('status.items.perClientConfigRequired'), value: t('common.no'), state: 'healthy' },
+      ],
+    };
+
+    const centralizedOAuth: HealthCategory = {
+      id: 'centralizedOAuth',
+      label: t('status.category.centralizedOAuth'),
+      description: t('status.categoryDescription.centralizedOAuth'),
+      overallState: status === 'failed' ? 'danger' : summary ? oauthState : 'unknown',
+      items: [
+        { id: 'oauth_status', label: t('status.items.oauth'), value: health?.oauth || t('status.state.unknown'), state: oauthState },
+        { id: 'oauth_access', label: t('status.items.accessTokenPresent'), value: boolText(summary?.oauth.accessTokenPresent), state: summary ? getConfiguredState(summary.oauth.accessTokenPresent) : 'unknown' },
+        { id: 'oauth_refresh', label: t('status.items.refreshTokenPresent'), value: boolText(summary?.oauth.refreshTokenPresent), state: summary ? getConfiguredState(summary.oauth.refreshTokenPresent) : 'unknown' },
+        { id: 'oauth_expires', label: t('status.items.expiresAt'), value: dateText(summary?.oauth.expiresAt), state: summary?.oauth.expired === null ? 'unknown' : summary?.oauth.expired ? 'warning' : 'healthy' },
+        { id: 'oauth_gateway', label: t('status.items.gatewayRefreshControl'), value: t('status.values.enabled'), state: 'healthy' },
+      ],
+    };
+
+    const instantStartup: HealthCategory = {
+      id: 'instantStartup',
+      label: t('status.category.instantStartup'),
+      description: t('status.categoryDescription.instantStartup'),
+      overallState: !summary
+        ? 'unknown'
+        : summary.oauth.accessTokenPresent
+          ? summary.oauth.expired
+            ? 'warning'
+            : 'healthy'
+          : 'danger',
+      items: [
+        { id: 'startup_access', label: t('status.items.accessTokenPresent'), value: boolText(summary?.oauth.accessTokenPresent), state: summary ? getConfiguredState(summary.oauth.accessTokenPresent) : 'unknown' },
+        { id: 'startup_expiry', label: t('status.items.expiresAt'), value: dateText(summary?.oauth.expiresAt), state: summary?.oauth.expired === null ? 'unknown' : summary?.oauth.expired ? 'warning' : 'healthy' },
+        { id: 'startup_mode', label: t('status.items.startupBehavior'), value: summary?.oauth.accessTokenPresent ? (summary.oauth.expired ? t('status.values.degradedStartup') : t('status.values.instantStartup')) : t('status.values.refreshRequired'), state: !summary ? 'unknown' : summary.oauth.expired ? 'warning' : 'healthy' },
+      ],
+    };
+
+    const proxyAware: HealthCategory = {
+      id: 'proxyAware',
+      label: t('status.category.proxyAware'),
+      description: t('status.categoryDescription.proxyAware'),
+      overallState: summary ? 'healthy' : 'unknown',
+      items: [
+        { id: 'proxy_upstream', label: t('status.items.upstream'), value: summary?.upstream ?? health?.upstream ?? fallback, state: summary?.upstream || health?.upstream ? 'healthy' : 'unknown' },
+        { id: 'proxy_http', label: t('status.items.httpProxy'), value: summary?.proxy.httpProxy ?? t('status.values.notConfigured'), state: summary?.proxy.httpProxy ? 'healthy' : 'unknown' },
+        { id: 'proxy_https', label: t('status.items.httpsProxy'), value: summary?.proxy.httpsProxy ?? t('status.values.notConfigured'), state: summary?.proxy.httpsProxy ? 'healthy' : 'unknown' },
+        { id: 'proxy_support', label: t('status.items.proxySupport'), value: t('status.values.enabled'), state: 'healthy' },
+      ],
+    };
+
+    const telemetryLeakPrevention: HealthCategory = {
+      id: 'telemetryLeakPrevention',
+      label: t('status.category.telemetryLeakPrevention'),
+      description: t('status.categoryDescription.telemetryLeakPrevention'),
+      overallState: 'healthy',
+      items: [
+        { id: 'telemetry_fields', label: t('status.items.strippedEventFields'), value: 'baseUrl, base_url, gateway', state: 'healthy' },
+        { id: 'telemetry_headers', label: t('status.items.strippedHeaders'), value: 'authorization, proxy-authorization, x-api-key, x-anthropic-billing-header', state: 'healthy' },
+        { id: 'telemetry_recursive', label: t('status.items.recursiveMetadataRewrite'), value: t('status.values.enabled'), state: 'healthy' },
+        { id: 'telemetry_generic', label: t('status.items.genericPayloadCoverage'), value: '/policy_limits, /settings', state: 'healthy' },
+        { id: 'telemetry_logs', label: t('status.items.logPath'), value: summary?.logPath ?? '~/.ccgw/logs/desktop-daemon.log', state: 'healthy' },
+      ],
+    };
+
+    return [
+      identityRewrite,
+      envRewrite,
+      promptSanitization,
+      billingHeader,
+      processMetrics,
+      zeroLoginClients,
+      centralizedOAuth,
+      instantStartup,
+      proxyAware,
+      telemetryLeakPrevention,
+    ];
+  }, [autostartEnabled, config, health, settings, status, t]);
 
   useEffect(() => {
-    const dangerCategories = categories.filter(c => c.overallState === 'danger');
+    const dangerCategories = categories.filter((category) => category.overallState === 'danger');
     if (dangerCategories.length > 0) {
-      const dangerFingerprint = dangerCategories.map(c => c.id).sort().join(',');
-      
-      if (notifiedDanger.current !== dangerFingerprint) {
-        // Only notify if we've observed a running cycle or explicitly failed
+      const fingerprint = dangerCategories.map((category) => category.id).sort().join(',');
+      if (notifiedDanger.current !== fingerprint) {
         if (hasObservedRunning.current || status === 'failed') {
-          notifiedDanger.current = dangerFingerprint;
-          const labels = dangerCategories.map(c => c.label).join(', ');
+          notifiedDanger.current = fingerprint;
           notifyDanger(
             t('status.dashboard'),
-            `Danger detected in: ${labels}`
+            `Danger detected in: ${dangerCategories.map((category) => category.label).join(', ')}`,
           ).catch(console.error);
         }
       }

@@ -5,6 +5,89 @@ export interface ConfigSummary {
   upstream: string;
   deviceId: string;
   clients: string[];
+  identity: IdentitySummary;
+  oauth: OAuthSummary;
+  env: EnvSummary;
+  promptEnv: PromptEnvSummary;
+  process: ProcessSummary;
+  logging: LoggingSummary;
+  canonicalProfilePath: string | null;
+  logPath: string;
+  proxy: ProxySummary;
+  launcher: LauncherSummary;
+}
+
+export interface IdentitySummary {
+  deviceId: string;
+  email: string;
+  accountUuid: string;
+  sessionId: string;
+}
+
+export interface OAuthSummary {
+  accessTokenPresent: boolean;
+  refreshTokenPresent: boolean;
+  expiresAt: number | null;
+  expired: boolean | null;
+}
+
+export interface CiFlagsSummary {
+  isCi: boolean;
+  isClaubbit: boolean;
+  isClaudeCodeRemote: boolean;
+  isLocalAgentMode: boolean;
+  isConductor: boolean;
+  isGithubAction: boolean;
+  isClaudeCodeAction: boolean;
+}
+
+export interface EnvSummary {
+  source: string;
+  keyCount: number;
+  platform: string;
+  platformRaw: string;
+  arch: string;
+  nodeVersion: string;
+  terminal: string;
+  packageManagers: string;
+  runtimes: string;
+  isRunningWithBun: boolean;
+  isClaudeAiAuth: boolean;
+  deploymentEnvironment: string;
+  version: string;
+  versionBase: string;
+  buildTime: string;
+  vcs: string;
+  ciFlags: CiFlagsSummary;
+}
+
+export interface PromptEnvSummary {
+  platform: string;
+  shell: string;
+  osVersion: string;
+  workingDir: string;
+}
+
+export interface ProcessSummary {
+  constrainedMemory: number;
+  rssRange: [number, number];
+  heapTotalRange: [number, number];
+  heapUsedRange: [number, number];
+}
+
+export interface LoggingSummary {
+  level: string;
+  audit: boolean;
+}
+
+export interface ProxySummary {
+  httpProxy: string | null;
+  httpsProxy: string | null;
+}
+
+export interface LauncherSummary {
+  available: boolean;
+  path: string | null;
 }
 
 export interface ConfigSnapshot {

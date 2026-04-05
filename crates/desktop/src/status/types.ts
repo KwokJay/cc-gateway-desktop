@@ -10,6 +10,7 @@ export interface HealthItem {
 export interface HealthCategory {
   id: string;
   label: string;
+  description?: string;
   items: HealthItem[];
   overallState: HealthState;
 }

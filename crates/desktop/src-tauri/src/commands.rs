@@ -19,6 +19,107 @@ pub struct ConfigSummary {
     pub upstream: String,
     pub device_id: String,
     pub clients: Vec<String>,
+    pub identity: IdentitySummary,
+    pub oauth: OAuthSummary,
+    pub env: EnvSummary,
+    pub prompt_env: PromptEnvSummary,
+    pub process: ProcessSummary,
+    pub logging: LoggingSummary,
+    pub canonical_profile_path: Option<String>,
+    pub log_path: String,
+    pub proxy: ProxySummary,
+    pub launcher: LauncherSummary,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentitySummary {
+    pub device_id: String,
+    pub email: String,
+    pub account_uuid: String,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthSummary {
+    pub access_token_present: bool,
+    pub refresh_token_present: bool,
+    pub expires_at: Option<i64>,
+    pub expired: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvSummary {
+    pub source: String,
+    pub key_count: usize,
+    pub platform: String,
+    pub platform_raw: String,
+    pub arch: String,
+    pub node_version: String,
+    pub terminal: String,
+    pub package_managers: String,
+    pub runtimes: String,
+    pub is_running_with_bun: bool,
+    pub is_claude_ai_auth: bool,
+    pub deployment_environment: String,
+    pub version: String,
+    pub version_base: String,
+    pub build_time: String,
+    pub vcs: String,
+    pub ci_flags: CiFlagsSummary,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CiFlagsSummary {
+    pub is_ci: bool,
+    pub is_claubbit: bool,
+    pub is_claude_code_remote: bool,
+    pub is_local_agent_mode: bool,
+    pub is_conductor: bool,
+    pub is_github_action: bool,
+    pub is_claude_code_action: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptEnvSummary {
+    pub platform: String,
+    pub shell: String,
+    pub os_version: String,
+    pub working_dir: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessSummary {
+    pub constrained_memory: u64,
+    pub rss_range: [u64; 2],
+    pub heap_total_range: [u64; 2],
+    pub heap_used_range: [u64; 2],
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoggingSummary {
+    pub level: String,
+    pub audit: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxySummary {
+    pub http_proxy: Option<String>,
+    pub https_proxy: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LauncherSummary {
+    pub available: bool,
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -47,6 +148,21 @@ fn requested_config_path(config_path: Option<String>) -> Result<PathBuf, String>
 }
 
 fn build_config_summary(config: &Config) -> ConfigSummary {
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .map(|duration| duration.as_millis() as i64);
+    let env_key_count = config
+        .canonical_profile
+        .as_ref()
+        .map(|profile| profile.env.len())
+        .unwrap_or_else(|| {
+            serde_json::to_value(&config.env)
+                .ok()
+                .and_then(|value| value.as_object().map(|object| object.len()))
+                .unwrap_or(0)
+        });
+
     ConfigSummary {
         port: config.server.port,
         upstream: config.upstream.url.clone(),
@@ -57,6 +173,86 @@ fn build_config_summary(config: &Config) -> ConfigSummary {
             .iter()
             .map(|token| token.name.clone())
             .collect(),
+        identity: IdentitySummary {
+            device_id: config.identity.device_id.clone(),
+            email: config.identity.email.clone(),
+            account_uuid: config.identity.account_uuid.clone(),
+            session_id: config.identity.session_id.clone(),
+        },
+        oauth: OAuthSummary {
+            access_token_present: config.oauth.access_token.is_some(),
+            refresh_token_present: !config.oauth.refresh_token.is_empty(),
+            expires_at: config.oauth.expires_at,
+            expired: config
+                .oauth
+                .expires_at
+                .and_then(|expires_at| now_ms.map(|now| expires_at <= now)),
+        },
+        env: EnvSummary {
+            source: if config.canonical_profile.is_some() {
+                "canonical-profile".to_string()
+            } else {
+                "inline-config".to_string()
+            },
+            key_count: env_key_count,
+            platform: config.env.platform.clone(),
+            platform_raw: config.env.platform_raw.clone(),
+            arch: config.env.arch.clone(),
+            node_version: config.env.node_version.clone(),
+            terminal: config.env.terminal.clone(),
+            package_managers: config.env.package_managers.clone(),
+            runtimes: config.env.runtimes.clone(),
+            is_running_with_bun: config.env.is_running_with_bun,
+            is_claude_ai_auth: config.env.is_claude_ai_auth,
+            deployment_environment: config.env.deployment_environment.clone(),
+            version: config.env.version.clone(),
+            version_base: config.env.version_base.clone(),
+            build_time: config.env.build_time.clone(),
+            vcs: config.env.vcs.clone(),
+            ci_flags: CiFlagsSummary {
+                is_ci: config.env.is_ci,
+                is_claubbit: config.env.is_claubbit,
+                is_claude_code_remote: config.env.is_claude_code_remote,
+                is_local_agent_mode: config.env.is_local_agent_mode,
+                is_conductor: config.env.is_conductor,
+                is_github_action: config.env.is_github_action,
+                is_claude_code_action: config.env.is_claude_code_action,
+            },
+        },
+        prompt_env: PromptEnvSummary {
+            platform: config.prompt_env.platform.clone(),
+            shell: config.prompt_env.shell.clone(),
+            os_version: config.prompt_env.os_version.clone(),
+            working_dir: config.prompt_env.working_dir.clone(),
+        },
+        process: ProcessSummary {
+            constrained_memory: config.process.constrained_memory,
+            rss_range: config.process.rss_range,
+            heap_total_range: config.process.heap_total_range,
+            heap_used_range: config.process.heap_used_range,
+        },
+        logging: LoggingSummary {
+            level: config.logging.level.clone(),
+            audit: config.logging.audit,
+        },
+        canonical_profile_path: config.canonical_profile_path.clone(),
+        log_path: DaemonProcess::default_log_path()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|_| "~/.ccgw/logs/desktop-daemon.log".to_string()),
+        proxy: ProxySummary {
+            http_proxy: std::env::var("HTTP_PROXY")
+                .ok()
+                .or_else(|| std::env::var("http_proxy").ok()),
+            https_proxy: std::env::var("HTTPS_PROXY")
+                .ok()
+                .or_else(|| std::env::var("https_proxy").ok()),
+        },
+        launcher: LauncherSummary {
+            available: which::which("ccg").is_ok(),
+            path: which::which("ccg")
+                .ok()
+                .map(|path| path.display().to_string()),
+        },
     }
 }
 

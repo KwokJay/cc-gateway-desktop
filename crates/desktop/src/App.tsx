@@ -472,6 +472,12 @@ export default function App() {
   }, [activeTab, config, configBusy, loadConfig]);
 
   useEffect(() => {
+    if (!config && !configBusy) {
+      void loadConfig();
+    }
+  }, [config, configBusy, loadConfig]);
+
+  useEffect(() => {
     if (activeTab !== 'logs') {
       return undefined;
     }
@@ -488,6 +494,12 @@ export default function App() {
       void loadSettings();
     }
   }, [activeTab, loadSettings, settings, settingsLoading]);
+
+  useEffect(() => {
+    if (!settings && !settingsLoading) {
+      void loadSettings();
+    }
+  }, [loadSettings, settings, settingsLoading]);
 
   const handleToggle = async () => {
     setLoading(true);
@@ -624,10 +636,17 @@ export default function App() {
             <StatusTab
               status={status}
               health={health}
+              config={config}
+              settings={settings}
+              autostartEnabled={autostartEnabled}
               loading={loading}
               error={error}
               onToggle={handleToggle}
-              onRefresh={fetchStatus}
+              onRefresh={() => {
+                void fetchStatus();
+                void loadConfig();
+                void loadSettings();
+              }}
             />
           )}
           {activeTab === 'config' && (
