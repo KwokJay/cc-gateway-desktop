@@ -179,7 +179,9 @@ pub async fn start_daemon(
     for _ in 0..20 {
         if let Ok(url) = daemon.health_url() {
             if let Ok(response) = client.get(&url).send().await {
-                if response.status().is_success() {
+                if response.status().is_success()
+                    || response.status() == reqwest::StatusCode::SERVICE_UNAVAILABLE
+                {
                     return Ok(());
                 }
             }

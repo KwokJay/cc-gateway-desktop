@@ -49,7 +49,9 @@ pub async fn build_app(config: Config) -> anyhow::Result<Router> {
 
 async fn build_state(config: Config) -> anyhow::Result<AppState> {
     let oauth = OAuthManager::from_config(&config.oauth)?;
-    oauth.init().await?;
+    if let Err(error) = oauth.init().await {
+        warn!("OAuth initialization degraded: {error:#}");
+    }
 
     let upstream = Url::parse(&config.upstream.url).context("invalid upstream url")?;
     let client = build_client()?;

@@ -281,14 +281,19 @@ impl DaemonProcess {
             .await
             .map_err(|e| format!("Health check request failed: {}", e))?;
 
-        if !response.status().is_success() {
-            return Err(format!("Health check failed: {}", response.status()));
-        }
-
-        response
-            .json::<DaemonHealth>()
+        let status = response.status();
+        let body = response
+            .text()
             .await
-            .map_err(|e| format!("Failed to parse health response: {}", e))
+            .map_err(|e| format!("Failed to read health response: {}", e))?;
+        let health = serde_json::from_str::<DaemonHealth>(&body)
+            .map_err(|e| format!("Failed to parse health response: {e}. Body: {body}"))?;
+
+        if status.is_success() || status == reqwest::StatusCode::SERVICE_UNAVAILABLE {
+            Ok(health)
+        } else {
+            Err(format!("Health check failed: {}", status))
+        }
     }
 
     pub fn health_url(&self) -> Result<String, String> {
