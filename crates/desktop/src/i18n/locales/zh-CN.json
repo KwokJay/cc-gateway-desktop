@@ -23,6 +23,8 @@
     "start": "启动",
     "stop": "停止",
     "error": "错误",
+    "reason": "原因",
+    "recommendation": "建议",
     "state": {
       "healthy": "正常",
       "warning": "警告",
@@ -119,6 +121,26 @@
       "degradedStartup": "以降级模式启动，等待刷新恢复",
       "refreshRequired": "代理请求成功前需要刷新",
       "notConfigured": "未配置"
+    },
+    "reasons": {
+      "missingAccountUuid": "当前 canonical identity 缺少 account_uuid，因此部分请求元数据无法完全归一化。",
+      "missingSessionId": "当前 canonical identity 缺少 session_id，因此会话元数据无法完全归一化。",
+      "inlineEnvSource": "当前使用的是内联 env 配置，而不是完整的 canonical profile 文件。",
+      "envKeyCount": "当前只有 {{count}} 个环境键；要和 TS 行为完全对齐，通常需要 40+ 键的 canonical profile。",
+      "noClientsConfigured": "当前还没有配置任何客户端 launcher token。",
+      "launcherMissing": "本地没有在 PATH 中找到 ccg launcher。",
+      "accessTokenMissing": "当前没有可用于即时启动的缓存 access token。",
+      "refreshTokenMissing": "当前没有 refresh token，因此 access token 过期后网关无法自动续期。",
+      "oauthExpired": "当前 OAuth 已过期，或者网关正在尝试刷新它。",
+      "startupDegraded": "网关可以启动并展示本地状态，但在 OAuth 刷新成功之前，真正的代理请求仍会处于降级状态。"
+    },
+    "suggestions": {
+      "fixConfigValidation": "打开配置页修正校验错误并保存，然后重新启动守护进程。",
+      "addIdentityFields": "补齐 canonical identity 字段，这样每个请求才能被一致地重写。",
+      "useCanonicalProfile": "如果你想让 40+ 环境维度与 TS 版本对齐，请配置 canonical_profile_path 指向完整的 profile JSON。",
+      "addClientTokens": "先生成或添加至少一个客户端 token，这样 launcher 模式的客户端才能接入网关。",
+      "installCliLauncher": "如果你依赖 launcher 流程，请安装 ccg 或确保它在 PATH 中可用。",
+      "loginClaude": "重新刷新本机 Claude OAuth 登录，这样网关才能重新拿到有效 access token。"
     }
   },
   "menu": {

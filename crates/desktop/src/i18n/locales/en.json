@@ -23,6 +23,8 @@
     "start": "Start Daemon",
     "stop": "Stop Daemon",
     "error": "Error",
+    "reason": "Reason",
+    "recommendation": "Recommendation",
     "state": {
       "healthy": "Healthy",
       "warning": "Warning",
@@ -119,6 +121,26 @@
       "degradedStartup": "Start in degraded mode until refresh succeeds",
       "refreshRequired": "Refresh required before proxy requests succeed",
       "notConfigured": "Not configured"
+    },
+    "reasons": {
+      "missingAccountUuid": "The canonical identity is missing account_uuid, so some request metadata cannot be fully normalized.",
+      "missingSessionId": "The canonical identity is missing session_id, so session metadata cannot be fully normalized.",
+      "inlineEnvSource": "The app is using the inline env block instead of a full canonical profile file.",
+      "envKeyCount": "Only {{count}} environment keys are available; full parity expects a 40+ key canonical profile.",
+      "noClientsConfigured": "No client launcher tokens are configured yet.",
+      "launcherMissing": "The local ccg launcher binary was not found in PATH.",
+      "accessTokenMissing": "No cached access token is available for instant startup.",
+      "refreshTokenMissing": "No refresh token is available, so the gateway cannot renew OAuth when the access token expires.",
+      "oauthExpired": "The cached OAuth token has already expired or the gateway is trying to refresh it.",
+      "startupDegraded": "The gateway can start and display local state, but proxy requests will stay degraded until OAuth refresh succeeds."
+    },
+    "suggestions": {
+      "fixConfigValidation": "Open the config tab, correct the validation errors, and save the file before restarting the daemon.",
+      "addIdentityFields": "Fill in the canonical identity fields so every request can be rewritten consistently.",
+      "useCanonicalProfile": "Point canonical_profile_path at a full profile JSON if you want 40+ environment dimensions to match the TS behavior.",
+      "addClientTokens": "Generate or add at least one client token so launcher-based clients can use the gateway.",
+      "installCliLauncher": "Install the ccg launcher or ensure it is available in PATH if you rely on launcher-based flows.",
+      "loginClaude": "Refresh the local Claude OAuth login so the gateway can obtain a valid access token again."
     }
   },
   "menu": {

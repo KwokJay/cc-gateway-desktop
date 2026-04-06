@@ -5,6 +5,8 @@ export interface HealthItem {
   label: string;
   value: string;
   state: HealthState;
+  reason?: string;
+  recommendation?: string;
 }
 
 export interface HealthCategory {

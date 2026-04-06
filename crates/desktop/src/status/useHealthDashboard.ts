@@ -54,6 +54,8 @@ export const useHealthDashboard = (
     const rangeText = (range?: [number, number]) =>
       range ? `${range[0].toLocaleString()} - ${range[1].toLocaleString()}` : t('common.noData');
     const fallback = t('common.noData');
+    const warningReason = (condition: boolean, reason: string, recommendation: string) =>
+      condition ? { reason, recommendation } : {};
 
     const identityRewrite: HealthCategory = {
       id: 'identityRewrite',
@@ -61,10 +63,40 @@ export const useHealthDashboard = (
       description: t('status.categoryDescription.identityRewrite'),
       overallState: configValid ? 'healthy' : config?.validationError ? 'danger' : 'unknown',
       items: [
-        { id: 'identity_device', label: t('status.items.device'), value: summary?.identity.deviceId ?? fallback, state: summary?.identity.deviceId ? 'healthy' : 'unknown' },
+        {
+          id: 'identity_device',
+          label: t('status.items.device'),
+          value: summary?.identity.deviceId ?? fallback,
+          state: config?.validationError ? 'danger' : summary?.identity.deviceId ? 'healthy' : 'unknown',
+          ...warningReason(
+            !!config?.validationError,
+            config?.validationError ?? '',
+            t('status.suggestions.fixConfigValidation'),
+          ),
+        },
         { id: 'identity_email', label: t('status.items.email'), value: summary?.identity.email ?? fallback, state: summary?.identity.email ? 'healthy' : 'unknown' },
-        { id: 'identity_account', label: t('status.items.accountUuid'), value: summary?.identity.accountUuid ?? fallback, state: summary?.identity.accountUuid ? 'healthy' : 'warning' },
-        { id: 'identity_session', label: t('status.items.sessionId'), value: summary?.identity.sessionId ?? fallback, state: summary?.identity.sessionId ? 'healthy' : 'warning' },
+        {
+          id: 'identity_account',
+          label: t('status.items.accountUuid'),
+          value: summary?.identity.accountUuid ?? fallback,
+          state: summary?.identity.accountUuid ? 'healthy' : 'warning',
+          ...warningReason(
+            !summary?.identity.accountUuid,
+            t('status.reasons.missingAccountUuid'),
+            t('status.suggestions.addIdentityFields'),
+          ),
+        },
+        {
+          id: 'identity_session',
+          label: t('status.items.sessionId'),
+          value: summary?.identity.sessionId ?? fallback,
+          state: summary?.identity.sessionId ? 'healthy' : 'warning',
+          ...warningReason(
+            !summary?.identity.sessionId,
+            t('status.reasons.missingSessionId'),
+            t('status.suggestions.addIdentityFields'),
+          ),
+        },
         { id: 'identity_userid', label: t('status.items.userIdRewrite'), value: t('status.values.enabled'), state: 'healthy' },
         { id: 'identity_generic', label: t('status.items.genericIdentityRewrite'), value: t('status.values.enabled'), state: 'healthy' },
       ],
@@ -83,8 +115,28 @@ export const useHealthDashboard = (
             ? 'warning'
             : 'danger',
       items: [
-        { id: 'env_source', label: t('status.items.envSource'), value: summary?.env.source ?? fallback, state: summary?.env.source === 'canonical-profile' ? 'healthy' : summary ? 'warning' : 'unknown' },
-        { id: 'env_count', label: t('status.items.envKeyCount'), value: summary ? String(summary.env.keyCount) : fallback, state: summary ? (summary.env.keyCount >= 40 ? 'healthy' : 'warning') : 'unknown' },
+        {
+          id: 'env_source',
+          label: t('status.items.envSource'),
+          value: summary?.env.source ?? fallback,
+          state: summary?.env.source === 'canonical-profile' ? 'healthy' : summary ? 'warning' : 'unknown',
+          ...warningReason(
+            !!summary && summary.env.source !== 'canonical-profile',
+            t('status.reasons.inlineEnvSource'),
+            t('status.suggestions.useCanonicalProfile'),
+          ),
+        },
+        {
+          id: 'env_count',
+          label: t('status.items.envKeyCount'),
+          value: summary ? String(summary.env.keyCount) : fallback,
+          state: summary ? (summary.env.keyCount >= 40 ? 'healthy' : summary.env.keyCount >= 20 ? 'warning' : 'danger') : 'unknown',
+          ...warningReason(
+            !!summary && summary.env.keyCount < 40,
+            t('status.reasons.envKeyCount', { count: summary?.env.keyCount ?? 0 }),
+            t('status.suggestions.useCanonicalProfile'),
+          ),
+        },
         { id: 'env_platform', label: t('status.items.platform'), value: summary?.env.platform ?? fallback, state: summary?.env.platform ? 'healthy' : 'unknown' },
         { id: 'env_platform_raw', label: t('status.items.platformRaw'), value: summary?.env.platformRaw ?? fallback, state: summary?.env.platformRaw ? 'healthy' : 'unknown' },
         { id: 'env_arch', label: t('status.items.arch'), value: summary?.env.arch ?? fallback, state: summary?.env.arch ? 'healthy' : 'unknown' },
@@ -144,8 +196,28 @@ export const useHealthDashboard = (
       overallState: summary ? getConfiguredState(summary.clients.length > 0) : 'unknown',
       items: [
         { id: 'clients_list', label: t('status.items.clients'), value: summary?.clients.join(', ') || fallback, state: summary?.clients.length ? 'healthy' : 'warning' },
-        { id: 'clients_count', label: t('status.items.clientCount'), value: summary ? String(summary.clients.length) : fallback, state: summary?.clients.length ? 'healthy' : 'warning' },
-        { id: 'clients_launcher', label: t('status.items.launcherPath'), value: summary?.launcher.path ?? fallback, state: summary?.launcher.available ? 'healthy' : 'warning' },
+        {
+          id: 'clients_count',
+          label: t('status.items.clientCount'),
+          value: summary ? String(summary.clients.length) : fallback,
+          state: summary?.clients.length ? 'healthy' : 'warning',
+          ...warningReason(
+            !!summary && summary.clients.length === 0,
+            t('status.reasons.noClientsConfigured'),
+            t('status.suggestions.addClientTokens'),
+          ),
+        },
+        {
+          id: 'clients_launcher',
+          label: t('status.items.launcherPath'),
+          value: summary?.launcher.path ?? fallback,
+          state: summary?.launcher.available ? 'healthy' : 'warning',
+          ...warningReason(
+            !!summary && !summary.launcher.available,
+            t('status.reasons.launcherMissing'),
+            t('status.suggestions.installCliLauncher'),
+          ),
+        },
         { id: 'clients_autostart', label: t('settings.autostart'), value: boolText(autostartEnabled), state: autostartEnabled ? 'healthy' : 'unknown' },
         { id: 'clients_minimized', label: t('settings.startMinimized'), value: boolText(settings?.startMinimized), state: settings ? 'healthy' : 'unknown' },
         { id: 'clients_browser', label: t('status.items.browserOauthRequired'), value: t('common.no'), state: 'healthy' },
@@ -161,9 +233,39 @@ export const useHealthDashboard = (
       overallState: status === 'failed' ? 'danger' : summary ? oauthState : 'unknown',
       items: [
         { id: 'oauth_status', label: t('status.items.oauth'), value: health?.oauth || t('status.state.unknown'), state: oauthState },
-        { id: 'oauth_access', label: t('status.items.accessTokenPresent'), value: boolText(summary?.oauth.accessTokenPresent), state: summary ? getConfiguredState(summary.oauth.accessTokenPresent) : 'unknown' },
-        { id: 'oauth_refresh', label: t('status.items.refreshTokenPresent'), value: boolText(summary?.oauth.refreshTokenPresent), state: summary ? getConfiguredState(summary.oauth.refreshTokenPresent) : 'unknown' },
-        { id: 'oauth_expires', label: t('status.items.expiresAt'), value: dateText(summary?.oauth.expiresAt), state: summary?.oauth.expired === null ? 'unknown' : summary?.oauth.expired ? 'warning' : 'healthy' },
+        {
+          id: 'oauth_access',
+          label: t('status.items.accessTokenPresent'),
+          value: boolText(summary?.oauth.accessTokenPresent),
+          state: summary ? getConfiguredState(summary.oauth.accessTokenPresent) : 'unknown',
+          ...warningReason(
+            !!summary && !summary.oauth.accessTokenPresent,
+            t('status.reasons.accessTokenMissing'),
+            t('status.suggestions.loginClaude'),
+          ),
+        },
+        {
+          id: 'oauth_refresh',
+          label: t('status.items.refreshTokenPresent'),
+          value: boolText(summary?.oauth.refreshTokenPresent),
+          state: summary ? getConfiguredState(summary.oauth.refreshTokenPresent) : 'unknown',
+          ...warningReason(
+            !!summary && !summary.oauth.refreshTokenPresent,
+            t('status.reasons.refreshTokenMissing'),
+            t('status.suggestions.loginClaude'),
+          ),
+        },
+        {
+          id: 'oauth_expires',
+          label: t('status.items.expiresAt'),
+          value: dateText(summary?.oauth.expiresAt),
+          state: summary?.oauth.expired === null ? 'unknown' : summary?.oauth.expired ? 'warning' : 'healthy',
+          ...warningReason(
+            !!summary?.oauth.expired,
+            t('status.reasons.oauthExpired'),
+            t('status.suggestions.loginClaude'),
+          ),
+        },
         { id: 'oauth_gateway', label: t('status.items.gatewayRefreshControl'), value: t('status.values.enabled'), state: 'healthy' },
       ],
     };
@@ -181,8 +283,28 @@ export const useHealthDashboard = (
           : 'danger',
       items: [
         { id: 'startup_access', label: t('status.items.accessTokenPresent'), value: boolText(summary?.oauth.accessTokenPresent), state: summary ? getConfiguredState(summary.oauth.accessTokenPresent) : 'unknown' },
-        { id: 'startup_expiry', label: t('status.items.expiresAt'), value: dateText(summary?.oauth.expiresAt), state: summary?.oauth.expired === null ? 'unknown' : summary?.oauth.expired ? 'warning' : 'healthy' },
-        { id: 'startup_mode', label: t('status.items.startupBehavior'), value: summary?.oauth.accessTokenPresent ? (summary.oauth.expired ? t('status.values.degradedStartup') : t('status.values.instantStartup')) : t('status.values.refreshRequired'), state: !summary ? 'unknown' : summary.oauth.expired ? 'warning' : 'healthy' },
+        {
+          id: 'startup_expiry',
+          label: t('status.items.expiresAt'),
+          value: dateText(summary?.oauth.expiresAt),
+          state: summary?.oauth.expired === null ? 'unknown' : summary?.oauth.expired ? 'warning' : 'healthy',
+          ...warningReason(
+            !!summary?.oauth.expired,
+            t('status.reasons.oauthExpired'),
+            t('status.suggestions.loginClaude'),
+          ),
+        },
+        {
+          id: 'startup_mode',
+          label: t('status.items.startupBehavior'),
+          value: summary?.oauth.accessTokenPresent ? (summary.oauth.expired ? t('status.values.degradedStartup') : t('status.values.instantStartup')) : t('status.values.refreshRequired'),
+          state: !summary ? 'unknown' : summary.oauth.expired ? 'warning' : 'healthy',
+          ...warningReason(
+            !!summary && !!summary.oauth.expired,
+            t('status.reasons.startupDegraded'),
+            t('status.suggestions.loginClaude'),
+          ),
+        },
       ],
     };
 

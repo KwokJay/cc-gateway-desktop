@@ -139,6 +139,26 @@ export function StatusTab({
                 <div className="text-sm font-mono text-slate-800 bg-slate-50 border border-slate-200 p-4 break-all">
                   {item.value}
                 </div>
+                {(item.reason || item.recommendation) && (
+                  <div className={`mt-3 space-y-2 border p-4 text-sm ${
+                    item.state === 'danger'
+                      ? 'border-red-300 bg-red-50 text-red-900'
+                      : item.state === 'warning'
+                        ? 'border-amber-300 bg-amber-50 text-amber-900'
+                        : 'border-slate-200 bg-white text-slate-700'
+                  }`}>
+                    {item.reason && (
+                      <div>
+                        <span className="font-semibold">{t('status.reason')}:</span> {item.reason}
+                      </div>
+                    )}
+                    {item.recommendation && (
+                      <div>
+                        <span className="font-semibold">{t('status.recommendation')}:</span> {item.recommendation}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
