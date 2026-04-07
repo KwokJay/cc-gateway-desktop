@@ -152,7 +152,7 @@ ccg help                  Show help
 | **Leak fields** | `baseUrl` (ANTHROPIC_BASE_URL) | → stripped |
 | | `gateway` (provider detection) | → stripped |
 
-`canonical_profile.rewrite_policy` metadata is preserved, surfaced through `/_health`, and logged at startup when present. It is still informational only: runtime request rewriting does not honor it yet.
+`canonical_profile.rewrite_policy` is active at runtime. `mode` supports `aggressive`, `conservative`, and `passthrough`; `strip_billing_header` controls billing-header removal; `normalize_timestamps` normalizes common event timestamp fields; and `preserve_fields` restores selected JSON paths from the original payload after rewriting.
 
 ## Deployment
 

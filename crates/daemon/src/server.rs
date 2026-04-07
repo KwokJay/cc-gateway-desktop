@@ -30,6 +30,22 @@ struct AppState {
     client: Client,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RewriteMode {
+    Aggressive,
+    Conservative,
+    Passthrough,
+}
+
+#[derive(Debug, Clone)]
+struct ActiveRewritePolicy {
+    configured: bool,
+    mode: RewriteMode,
+    strip_billing_header: bool,
+    normalize_timestamps: bool,
+    preserve_fields: Vec<String>,
+}
+
 pub async fn run(config: Config) -> anyhow::Result<()> {
     let state = build_state(config).await?;
     let port = state.config.server.port;
@@ -130,13 +146,14 @@ fn log_startup(state: &AppState, local_addr: SocketAddr, tls_enabled: bool) {
             .collect::<Vec<_>>()
             .join(", ")
     );
-    if let Some(policy) = state.config.rewrite_policy() {
-        warn!(
-            mode = policy.mode.as_deref().unwrap_or("unset"),
-            strip_billing_header = policy.strip_billing_header.unwrap_or(false),
-            normalize_timestamps = policy.normalize_timestamps.unwrap_or(false),
-            preserve_fields = policy.preserve_fields.as_ref().map_or(0, Vec::len),
-            "Canonical profile rewrite_policy is informational only; runtime request rewriting does not apply it yet"
+    let policy = active_rewrite_policy(&state.config);
+    if policy.configured {
+        info!(
+            mode = policy.mode_label(),
+            strip_billing_header = policy.strip_billing_header,
+            normalize_timestamps = policy.normalize_timestamps,
+            preserve_fields = policy.preserve_fields.len(),
+            "Canonical profile rewrite_policy is active"
         );
     }
 }
@@ -211,20 +228,22 @@ async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 fn rewrite_policy_health(config: &Config) -> Value {
-    match config.rewrite_policy() {
-        Some(policy) => json!({
+    let policy = active_rewrite_policy(config);
+    if policy.configured {
+        json!({
             "configured": true,
-            "effective": false,
-            "mode": policy.mode,
+            "effective": true,
+            "mode": policy.mode_label(),
             "strip_billing_header": policy.strip_billing_header,
             "normalize_timestamps": policy.normalize_timestamps,
             "preserve_fields": policy.preserve_fields,
-            "detail": "canonical_profile.rewrite_policy is parsed but not applied by runtime yet"
-        }),
-        None => json!({
+            "detail": "runtime rewrite_policy is active"
+        })
+    } else {
+        json!({
             "configured": false,
             "effective": false
-        }),
+        })
     }
 }
 
@@ -434,51 +453,93 @@ fn rewrite_request_body(body: &[u8], path: &str, config: &Config) -> Vec<u8> {
     let Ok(mut parsed) = serde_json::from_slice::<Value>(body) else {
         return body.to_vec();
     };
+    let original = parsed.clone();
+    let policy = active_rewrite_policy(config);
+
+    if policy.mode == RewriteMode::Passthrough {
+        return body.to_vec();
+    }
 
     if path.starts_with("/v1/messages") {
-        rewrite_messages_body(&mut parsed, config);
+        rewrite_messages_body(&mut parsed, config, &policy);
     } else if path.contains("/event_logging/batch") {
-        rewrite_event_batch(&mut parsed, config);
+        rewrite_event_batch(&mut parsed, config, &policy);
     } else if path.contains("/policy_limits") || path.contains("/settings") {
         rewrite_generic_identity(&mut parsed, &config.identity);
+    }
+
+    if !policy.preserve_fields.is_empty() {
+        for path in &policy.preserve_fields {
+            preserve_field(&original, &mut parsed, path);
+        }
     }
 
     serde_json::to_vec(&parsed).unwrap_or_else(|_| body.to_vec())
 }
 
-fn rewrite_messages_body(body: &mut Value, config: &Config) {
+fn rewrite_messages_body(body: &mut Value, config: &Config, policy: &ActiveRewritePolicy) {
     rewrite_messages_metadata(body, &config.identity);
 
-    if let Some(messages) = body.get_mut("messages").and_then(Value::as_array_mut) {
-        for message in messages {
-            rewrite_text_container(message.get_mut("content"), |text| {
-                rewrite_system_reminders(text, &config.prompt_env)
-            });
+    if policy.mode == RewriteMode::Aggressive {
+        if let Some(messages) = body.get_mut("messages").and_then(Value::as_array_mut) {
+            for message in messages {
+                rewrite_text_container(message.get_mut("content"), |text| {
+                    rewrite_system_reminders(text, &config.prompt_env)
+                });
+            }
         }
-    }
 
-    let version = config
-        .get_env_value("version")
-        .and_then(Value::as_str)
-        .unwrap_or(&config.env.version);
-    let hash = extract_first_user_message_text(body)
-        .filter(|text| !text.is_empty())
-        .map(|text| ccgw_core::compute_cch(&text, version))
-        .unwrap_or_else(fallback_cch_hash);
+        let version = config
+            .get_env_value("version")
+            .and_then(Value::as_str)
+            .unwrap_or(&config.env.version);
+        let hash = extract_first_user_message_text(body)
+            .filter(|text| !text.is_empty())
+            .map(|text| ccgw_core::compute_cch(&text, version))
+            .unwrap_or_else(fallback_cch_hash);
 
-    if let Some(system) = body.get_mut("system") {
-        rewrite_system_body(system, config, version, Some(hash.as_str()));
+        if let Some(system) = body.get_mut("system") {
+            rewrite_system_body(
+                system,
+                config,
+                version,
+                Some(hash.as_str()),
+                policy.strip_billing_header,
+            );
+        }
+    } else if policy.strip_billing_header {
+        strip_billing_header_only(body.get_mut("system"));
     }
 }
 
-fn rewrite_system_body(system: &mut Value, config: &Config, version: &str, hash: Option<&str>) {
+fn rewrite_system_body(
+    system: &mut Value,
+    config: &Config,
+    version: &str,
+    hash: Option<&str>,
+    strip_billing_header: bool,
+) {
     match system {
         Value::Array(items) => {
-            items.retain(|item| !system_item_is_billing_only(item));
+            if strip_billing_header {
+                for item in items.iter_mut() {
+                    strip_billing_header_from_value(item);
+                }
+                items.retain(|item| {
+                    extract_text(item)
+                        .map(|text| !text.trim().is_empty())
+                        .unwrap_or(true)
+                });
+            }
             for item in items {
                 rewrite_text_container(Some(item), |text| {
+                    let rewritten_input = if strip_billing_header {
+                        strip_billing_header_block(text)
+                    } else {
+                        text.to_string()
+                    };
                     rewrite_prompt_text_with_hash(
-                        &strip_billing_header_block(text),
+                        &rewritten_input,
                         &config.prompt_env,
                         Some(version),
                         hash,
@@ -487,12 +548,43 @@ fn rewrite_system_body(system: &mut Value, config: &Config, version: &str, hash:
             }
         }
         Value::String(text) => {
+            let rewritten_input = if strip_billing_header {
+                strip_billing_header_block(text)
+            } else {
+                text.clone()
+            };
             *text = rewrite_prompt_text_with_hash(
-                &strip_billing_header_block(text),
+                &rewritten_input,
                 &config.prompt_env,
                 Some(version),
                 hash,
             );
+        }
+        _ => {}
+    }
+}
+
+fn strip_billing_header_only(system: Option<&mut Value>) {
+    let Some(system) = system else {
+        return;
+    };
+
+    match system {
+        Value::Array(items) => {
+            for item in items.iter_mut() {
+                strip_billing_header_from_value(item);
+            }
+            items.retain(|item| {
+                extract_text(item)
+                    .map(|text| !text.trim().is_empty())
+                    .unwrap_or(true)
+            });
+        }
+        Value::String(text) => *text = strip_billing_header_block(text),
+        Value::Object(map) => {
+            if let Some(Value::String(text)) = map.get_mut("text") {
+                *text = strip_billing_header_block(text);
+            }
         }
         _ => {}
     }
@@ -525,7 +617,7 @@ fn fallback_cch_hash() -> String {
     format!("{seed:03x}")
 }
 
-fn rewrite_event_batch(body: &mut Value, config: &Config) {
+fn rewrite_event_batch(body: &mut Value, config: &Config, policy: &ActiveRewritePolicy) {
     let Some(events) = body.get_mut("events").and_then(Value::as_array_mut) else {
         return;
     };
@@ -536,8 +628,10 @@ fn rewrite_event_batch(body: &mut Value, config: &Config) {
         };
 
         rewrite_event_identity(event_data, &config.identity);
-        rewrite_event_env(event_data, config);
-        rewrite_event_process(event_data, &config.process);
+        if policy.mode == RewriteMode::Aggressive {
+            rewrite_event_env(event_data, config);
+            rewrite_event_process(event_data, &config.process);
+        }
 
         if let Some(object) = event_data.as_object_mut() {
             object.remove("baseUrl");
@@ -548,6 +642,10 @@ fn rewrite_event_batch(body: &mut Value, config: &Config) {
                 rewrite_additional_metadata(metadata, &config.identity);
             }
         }
+    }
+
+    if policy.normalize_timestamps {
+        normalize_timestamps(body, config);
     }
 }
 
@@ -606,17 +704,23 @@ fn rewrite_text_container(target: Option<&mut Value>, mut rewriter: impl FnMut(&
     }
 }
 
-fn system_item_is_billing_only(item: &Value) -> bool {
-    extract_text(item)
-        .map(|text| text.trim_start().starts_with("x-anthropic-billing-header:"))
-        .unwrap_or(false)
-}
-
 fn strip_billing_header_block(text: &str) -> String {
     text.lines()
         .filter(|line| !line.trim_start().starts_with("x-anthropic-billing-header:"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn strip_billing_header_from_value(value: &mut Value) {
+    match value {
+        Value::String(text) => *text = strip_billing_header_block(text),
+        Value::Object(map) => {
+            if let Some(Value::String(text)) = map.get_mut("text") {
+                *text = strip_billing_header_block(text);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn extract_text(value: &Value) -> Option<&str> {
@@ -642,6 +746,151 @@ fn convert_request_headers(headers: &HeaderMap) -> reqwest::header::HeaderMap {
     }
 
     converted
+}
+
+impl ActiveRewritePolicy {
+    fn mode_label(&self) -> &str {
+        match self.mode {
+            RewriteMode::Aggressive => "aggressive",
+            RewriteMode::Conservative => "conservative",
+            RewriteMode::Passthrough => "passthrough",
+        }
+    }
+}
+
+fn active_rewrite_policy(config: &Config) -> ActiveRewritePolicy {
+    let Some(policy) = config.rewrite_policy() else {
+        return ActiveRewritePolicy {
+            configured: false,
+            mode: RewriteMode::Aggressive,
+            strip_billing_header: true,
+            normalize_timestamps: false,
+            preserve_fields: Vec::new(),
+        };
+    };
+
+    let mode = match policy.mode.as_deref() {
+        Some("passthrough") => RewriteMode::Passthrough,
+        Some("conservative") => RewriteMode::Conservative,
+        _ => RewriteMode::Aggressive,
+    };
+
+    ActiveRewritePolicy {
+        configured: true,
+        mode,
+        strip_billing_header: policy.strip_billing_header.unwrap_or(true),
+        normalize_timestamps: policy.normalize_timestamps.unwrap_or(false),
+        preserve_fields: policy.preserve_fields.clone().unwrap_or_default(),
+    }
+}
+
+fn preserve_field(original: &Value, rewritten: &mut Value, path: &str) {
+    let Some(original_value) = value_at_path(original, path).cloned() else {
+        return;
+    };
+    set_value_at_path(rewritten, path, original_value);
+}
+
+fn value_at_path<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
+    let mut current = value;
+    for segment in path.split('.') {
+        current = match current {
+            Value::Object(map) => map.get(segment)?,
+            Value::Array(items) => items.get(segment.parse::<usize>().ok()?)?,
+            _ => return None,
+        };
+    }
+    Some(current)
+}
+
+fn set_value_at_path(value: &mut Value, path: &str, replacement: Value) {
+    let segments: Vec<&str> = path.split('.').collect();
+    if segments.is_empty() {
+        return;
+    }
+
+    let mut current = value;
+    for segment in &segments[..segments.len().saturating_sub(1)] {
+        current = match current {
+            Value::Object(map) => match map.get_mut(*segment) {
+                Some(next) => next,
+                None => return,
+            },
+            Value::Array(items) => match segment.parse::<usize>().ok().and_then(|idx| items.get_mut(idx)) {
+                Some(next) => next,
+                None => return,
+            },
+            _ => return,
+        };
+    }
+
+    let last = segments[segments.len() - 1];
+    match current {
+        Value::Object(map) => {
+            map.insert(last.to_string(), replacement);
+        }
+        Value::Array(items) => {
+            if let Ok(index) = last.parse::<usize>() {
+                if let Some(slot) = items.get_mut(index) {
+                    *slot = replacement;
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn normalize_timestamps(value: &mut Value, config: &Config) {
+    let canonical_rfc3339 = config
+        .get_env_value("build_time")
+        .and_then(Value::as_str)
+        .unwrap_or(&config.env.build_time)
+        .to_string();
+    let canonical_millis = chrono::DateTime::parse_from_rfc3339(&canonical_rfc3339)
+        .map(|value| value.timestamp_millis())
+        .unwrap_or(0);
+    normalize_timestamps_recursive(value, &canonical_rfc3339, canonical_millis);
+}
+
+fn normalize_timestamps_recursive(value: &mut Value, canonical_rfc3339: &str, canonical_millis: i64) {
+    match value {
+        Value::Object(map) => {
+            for (key, nested) in map.iter_mut() {
+                if is_timestamp_key(key) {
+                    match nested {
+                        Value::String(_) => *nested = Value::String(canonical_rfc3339.to_string()),
+                        Value::Number(_) => *nested = Value::Number(canonical_millis.into()),
+                        _ => normalize_timestamps_recursive(nested, canonical_rfc3339, canonical_millis),
+                    }
+                } else {
+                    normalize_timestamps_recursive(nested, canonical_rfc3339, canonical_millis);
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                normalize_timestamps_recursive(item, canonical_rfc3339, canonical_millis);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_timestamp_key(key: &str) -> bool {
+    let normalized = key.to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "timestamp"
+            | "created_at"
+            | "updated_at"
+            | "event_time"
+            | "sent_at"
+            | "received_at"
+            | "client_timestamp"
+            | "server_timestamp"
+            | "started_at"
+            | "finished_at"
+    )
 }
 
 #[cfg(test)]

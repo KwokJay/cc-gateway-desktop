@@ -47,7 +47,7 @@ fn main() {
                     {
                         let _ = window.set_visible_on_all_workspaces(true);
                     }
-                    let _ = window.set_always_on_top(true);
+                    let _ = window.set_always_on_top(false);
                     let _ = window.set_focus();
                 }
             }
@@ -64,7 +64,7 @@ fn main() {
                         {
                             let _ = window.set_visible_on_all_workspaces(true);
                         }
-                        let _ = window.set_always_on_top(true);
+                        let _ = window.set_always_on_top(false);
                         let _ = window.set_focus();
                     }
                 }
@@ -95,6 +95,7 @@ fn main() {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.unminimize();
                             let _ = window.show();
+                            let _ = window.set_always_on_top(false);
                             let _ = window.set_focus();
                         }
                     }

@@ -235,7 +235,7 @@ async fn health_endpoint_surfaces_configured_rewrite_policy_as_informational_onl
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     let payload: Value = response.json().await.unwrap();
     assert_eq!(payload["rewrite_policy"]["configured"], true);
-    assert_eq!(payload["rewrite_policy"]["effective"], false);
+    assert_eq!(payload["rewrite_policy"]["effective"], true);
     assert_eq!(payload["rewrite_policy"]["mode"], "conservative");
     assert_eq!(payload["rewrite_policy"]["strip_billing_header"], true);
     assert_eq!(
@@ -245,7 +245,7 @@ async fn health_endpoint_surfaces_configured_rewrite_policy_as_informational_onl
     assert!(payload["rewrite_policy"]["detail"]
         .as_str()
         .unwrap()
-        .contains("not applied"));
+        .contains("active"));
 }
 
 #[tokio::test]
@@ -383,6 +383,206 @@ async fn proxy_rewrites_policy_limits_generic_identity_payloads() {
     assert_eq!(forwarded_body["account_uuid"], "canonical-account-uuid");
     assert_eq!(forwarded_body["session_id"], "canonical-session-id");
     assert_eq!(forwarded_body["other_field"], "preserved");
+}
+
+#[tokio::test]
+async fn rewrite_policy_passthrough_mode_skips_message_rewrites() {
+    let upstream = spawn_upstream().await;
+    let mut config = test_config_with_canonical_profile(&upstream.base_url);
+    config.canonical_profile.as_mut().unwrap().rewrite_policy =
+        Some(ccgw_core::config::RewritePolicy {
+            mode: Some("passthrough".to_string()),
+            strip_billing_header: Some(true),
+            normalize_timestamps: Some(false),
+            preserve_fields: Some(Vec::new()),
+        });
+    let daemon = spawn_daemon(config).await;
+    let client = reqwest::Client::new();
+
+    let request_body = json!({
+        "metadata": {
+            "user_id": serde_json::to_string(&json!({
+                "device_id": "real-device",
+                "email": "real@example.com",
+                "account_uuid": "acct-1"
+            })).unwrap()
+        },
+        "system": [{
+            "type": "text",
+            "text": "x-anthropic-billing-header: cc_version=2.1.81.a1b;"
+        }],
+        "messages": [{
+            "role": "user",
+            "content": "<system-reminder>Working directory: /home/bob/repo</system-reminder>"
+        }]
+    });
+
+    let response = client
+        .post(format!("{}/v1/messages", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .json(&request_body)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::CREATED);
+    let captured = wait_for_captured_request(&upstream.captured).await;
+    let forwarded_body: Value = serde_json::from_slice(&captured.body).unwrap();
+
+    let metadata: Value =
+        serde_json::from_str(forwarded_body["metadata"]["user_id"].as_str().unwrap()).unwrap();
+    assert_eq!(metadata["device_id"], "real-device");
+    assert_eq!(metadata["email"], "real@example.com");
+    assert_eq!(
+        forwarded_body["messages"][0]["content"],
+        request_body["messages"][0]["content"]
+    );
+    assert_eq!(forwarded_body["system"][0]["text"], request_body["system"][0]["text"]);
+}
+
+#[tokio::test]
+async fn rewrite_policy_conservative_mode_only_strips_billing_header() {
+    let upstream = spawn_upstream().await;
+    let mut config = test_config_with_canonical_profile(&upstream.base_url);
+    config.canonical_profile.as_mut().unwrap().rewrite_policy =
+        Some(ccgw_core::config::RewritePolicy {
+            mode: Some("conservative".to_string()),
+            strip_billing_header: Some(true),
+            normalize_timestamps: Some(false),
+            preserve_fields: Some(Vec::new()),
+        });
+    let daemon = spawn_daemon(config).await;
+    let client = reqwest::Client::new();
+
+    let request_body = json!({
+        "metadata": {
+            "user_id": serde_json::to_string(&json!({
+                "device_id": "real-device",
+                "email": "real@example.com",
+                "account_uuid": "acct-1"
+            })).unwrap()
+        },
+        "system": [{
+            "type": "text",
+            "text": "x-anthropic-billing-header: cc_version=2.1.81.a1b;\nWorking directory: /home/bob/repo"
+        }],
+        "messages": [{
+            "role": "user",
+            "content": "<system-reminder>Working directory: /home/bob/repo</system-reminder>"
+        }]
+    });
+
+    let response = client
+        .post(format!("{}/v1/messages", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .json(&request_body)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::CREATED);
+    let captured = wait_for_captured_request(&upstream.captured).await;
+    let forwarded_body: Value = serde_json::from_slice(&captured.body).unwrap();
+
+    let metadata: Value =
+        serde_json::from_str(forwarded_body["metadata"]["user_id"].as_str().unwrap()).unwrap();
+    assert_eq!(metadata["device_id"], "canonical-device-id");
+    assert_eq!(metadata["email"], "canonical@example.com");
+    assert_eq!(
+        forwarded_body["messages"][0]["content"],
+        request_body["messages"][0]["content"]
+    );
+    let system_text = forwarded_body["system"][0]["text"].as_str().unwrap();
+    assert!(!system_text.contains("x-anthropic-billing-header"));
+    assert!(system_text.contains("Working directory: /home/bob/repo"));
+}
+
+#[tokio::test]
+async fn rewrite_policy_preserve_fields_restore_original_values() {
+    let upstream = spawn_upstream().await;
+    let mut config = test_config_with_canonical_profile(&upstream.base_url);
+    config.canonical_profile.as_mut().unwrap().rewrite_policy =
+        Some(ccgw_core::config::RewritePolicy {
+            mode: Some("aggressive".to_string()),
+            strip_billing_header: Some(true),
+            normalize_timestamps: Some(false),
+            preserve_fields: Some(vec!["metadata.user_id".to_string()]),
+        });
+    let daemon = spawn_daemon(config).await;
+    let client = reqwest::Client::new();
+
+    let request_body = json!({
+        "metadata": {
+            "user_id": serde_json::to_string(&json!({
+                "device_id": "real-device",
+                "email": "real@example.com",
+                "account_uuid": "acct-1"
+            })).unwrap()
+        },
+        "messages": [{ "role": "user", "content": "hello" }],
+        "system": []
+    });
+
+    let response = client
+        .post(format!("{}/v1/messages", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .json(&request_body)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::CREATED);
+    let captured = wait_for_captured_request(&upstream.captured).await;
+    let forwarded_body: Value = serde_json::from_slice(&captured.body).unwrap();
+    assert_eq!(
+        forwarded_body["metadata"]["user_id"],
+        request_body["metadata"]["user_id"]
+    );
+}
+
+#[tokio::test]
+async fn rewrite_policy_normalize_timestamps_rewrites_event_fields() {
+    let upstream = spawn_upstream().await;
+    let mut config = test_config_with_canonical_profile(&upstream.base_url);
+    config.canonical_profile.as_mut().unwrap().rewrite_policy =
+        Some(ccgw_core::config::RewritePolicy {
+            mode: Some("aggressive".to_string()),
+            strip_billing_header: Some(true),
+            normalize_timestamps: Some(true),
+            preserve_fields: Some(Vec::new()),
+        });
+    let expected_time = "2026-04-01T00:00:00Z";
+    let expected_millis = 1_775_001_600_000i64;
+    let daemon = spawn_daemon(config).await;
+    let client = reqwest::Client::new();
+
+    let response = client
+        .post(format!("{}/api/event_logging/batch", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .json(&json!({
+            "events": [{
+                "event_data": {
+                    "device_id": "real-device",
+                    "timestamp": 1710000000000i64,
+                    "created_at": "2025-01-01T00:00:00Z",
+                    "nested": {
+                        "event_time": "2025-02-01T00:00:00Z"
+                    }
+                }
+            }]
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::CREATED);
+    let captured = wait_for_captured_request(&upstream.captured).await;
+    let forwarded_body: Value = serde_json::from_slice(&captured.body).unwrap();
+    let event_data = &forwarded_body["events"][0]["event_data"];
+
+    assert_eq!(event_data["timestamp"], expected_millis);
+    assert_eq!(event_data["created_at"], expected_time);
+    assert_eq!(event_data["nested"]["event_time"], expected_time);
 }
 
 #[tokio::test]
