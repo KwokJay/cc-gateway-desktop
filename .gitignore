@@ -7,7 +7,7 @@ certs/
 clients/
 .omx/
 .planning/
-.docs/
+docs/
 .sisyphus/
 .cargo/
 .claude/
