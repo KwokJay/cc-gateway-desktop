@@ -107,6 +107,8 @@ pub struct EnvConfig {
     pub build_time: String,
     pub deployment_environment: String,
     pub vcs: String,
+    #[serde(flatten, default)]
+    pub extra: HashMap<String, JsonValue>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -231,6 +233,12 @@ impl Config {
         } else {
             None
         }
+    }
+
+    pub fn rewrite_policy(&self) -> Option<&RewritePolicy> {
+        self.canonical_profile
+            .as_ref()
+            .and_then(|profile| profile.rewrite_policy.as_ref())
     }
 }
 

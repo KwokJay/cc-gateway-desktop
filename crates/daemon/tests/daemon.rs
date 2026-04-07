@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use axum::body::{to_bytes, Body};
 use axum::extract::State;
@@ -11,6 +12,8 @@ use ccgw_core::Config;
 use ccgw_daemon::build_app;
 use chrono::{Duration as ChronoDuration, Utc};
 use serde_json::{json, Value};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 #[derive(Clone, Debug)]
 struct CapturedRequest {
     method: String,
@@ -38,6 +41,7 @@ async fn health_endpoint_is_public() {
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["oauth"], "valid");
     assert_eq!(payload["canonical_platform"], "darwin");
+    assert_eq!(payload["rewrite_policy"]["configured"], false);
     assert_eq!(payload["clients"][0], "alice");
 }
 
@@ -85,6 +89,7 @@ async fn proxy_forwards_authenticated_requests_with_rewrites_and_oauth_token() {
         "metadata": {
             "user_id": serde_json::to_string(&json!({
                 "device_id": "real-device",
+                "email": "real@example.com",
                 "account_uuid": "acct-1"
             })).unwrap()
         },
@@ -127,6 +132,7 @@ async fn proxy_forwards_authenticated_requests_with_rewrites_and_oauth_token() {
     let metadata: Value =
         serde_json::from_str(forwarded_body["metadata"]["user_id"].as_str().unwrap()).unwrap();
     assert_eq!(metadata["device_id"], "canonical-device-id");
+    assert_eq!(metadata["email"], "canonical@example.com");
     assert_eq!(forwarded_body["system"].as_array().unwrap().len(), 1);
     assert!(forwarded_body["system"][0]["text"]
         .as_str()
@@ -136,6 +142,40 @@ async fn proxy_forwards_authenticated_requests_with_rewrites_and_oauth_token() {
         .as_str()
         .unwrap()
         .contains("/Users/canonical/project"));
+}
+
+#[tokio::test]
+async fn proxy_streams_chunked_upstream_without_waiting_for_full_body() {
+    let upstream = spawn_chunked_upstream().await;
+    let daemon = spawn_daemon(test_config(&upstream.base_url)).await;
+    let client = reqwest::Client::new();
+
+    let mut response = client
+        .get(format!("{}/streaming", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    let first_chunk = tokio::time::timeout(Duration::from_millis(120), response.chunk())
+        .await
+        .expect("first chunk should arrive before upstream finishes")
+        .expect("stream should yield first chunk")
+        .expect("first chunk should be readable");
+    assert!(std::str::from_utf8(&first_chunk)
+        .unwrap_or_default()
+        .contains("data: first"));
+
+    let second_chunk = tokio::time::timeout(Duration::from_millis(250), response.chunk())
+        .await
+        .expect("second chunk should arrive after the upstream delay")
+        .expect("stream should yield second chunk")
+        .expect("second chunk should be readable");
+    assert!(std::str::from_utf8(&second_chunk)
+        .unwrap_or_default()
+        .contains("data: second"));
 }
 
 #[tokio::test]
@@ -173,6 +213,39 @@ async fn proxy_prefers_canonical_profile_version_and_platform() {
         header_value(&captured.headers, "user-agent"),
         Some("claude-code/2.2.0 (external, cli)")
     );
+}
+
+#[tokio::test]
+async fn health_endpoint_surfaces_configured_rewrite_policy_as_informational_only() {
+    let upstream = spawn_upstream().await;
+    let mut config = test_config_with_canonical_profile(&upstream.base_url);
+    config.canonical_profile.as_mut().unwrap().rewrite_policy =
+        Some(ccgw_core::config::RewritePolicy {
+            mode: Some("conservative".to_string()),
+            strip_billing_header: Some(true),
+            normalize_timestamps: Some(false),
+            preserve_fields: Some(vec!["metadata.user_id".to_string()]),
+        });
+    let daemon = spawn_daemon(config).await;
+
+    let response = reqwest::get(format!("{}/_health", daemon.base_url))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let payload: Value = response.json().await.unwrap();
+    assert_eq!(payload["rewrite_policy"]["configured"], true);
+    assert_eq!(payload["rewrite_policy"]["effective"], false);
+    assert_eq!(payload["rewrite_policy"]["mode"], "conservative");
+    assert_eq!(payload["rewrite_policy"]["strip_billing_header"], true);
+    assert_eq!(
+        payload["rewrite_policy"]["preserve_fields"][0],
+        "metadata.user_id"
+    );
+    assert!(payload["rewrite_policy"]["detail"]
+        .as_str()
+        .unwrap()
+        .contains("not applied"));
 }
 
 #[tokio::test]
@@ -245,6 +318,32 @@ async fn proxy_strips_sensitive_headers_and_preserves_non_json_body() {
         None
     );
     assert_eq!(String::from_utf8(captured.body).unwrap(), raw_body);
+}
+
+#[tokio::test]
+async fn proxy_coalesces_duplicate_request_headers_to_match_ts_behavior() {
+    let upstream = spawn_upstream().await;
+    let daemon = spawn_daemon(test_config(&upstream.base_url)).await;
+    let client = reqwest::Client::new();
+
+    let response = client
+        .post(format!("{}/v1/messages", daemon.base_url))
+        .header("x-api-key", "client-token")
+        .header("x-feature-flag", "alpha")
+        .header("x-feature-flag", "beta")
+        .json(&json!({
+            "messages": [{ "role": "user", "content": "hello" }],
+            "system": []
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::CREATED);
+
+    let captured = wait_for_captured_request(&upstream.captured).await;
+    let feature_flags = header_values(&captured.headers, "x-feature-flag");
+    assert_eq!(feature_flags, vec!["alpha, beta"]);
 }
 
 #[tokio::test]
@@ -547,7 +646,12 @@ async fn spawn_daemon(config: Config) -> SpawnedServer {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let handle = tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
 
     SpawnedServer {
@@ -573,6 +677,34 @@ async fn spawn_upstream() -> SpawnedUpstream {
     SpawnedUpstream {
         base_url: format!("http://{}", addr),
         captured,
+        handle,
+    }
+}
+
+async fn spawn_chunked_upstream() -> SpawnedServer {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let handle = tokio::spawn(async move {
+        loop {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let _request = read_http_request(&mut stream).await;
+
+            stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n",
+                )
+                .await
+                .unwrap();
+
+            write_chunk(&mut stream, b"data: first\n\n").await;
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            write_chunk(&mut stream, b"data: second\n\n").await;
+            stream.write_all(b"0\r\n\r\n").await.unwrap();
+        }
+    });
+
+    SpawnedServer {
+        base_url: format!("http://{}", addr),
         handle,
     }
 }
@@ -628,4 +760,37 @@ fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a s
         .iter()
         .find(|(header_name, _)| header_name.eq_ignore_ascii_case(name))
         .map(|(_, value)| value.as_str())
+}
+
+fn header_values<'a>(headers: &'a [(String, String)], name: &str) -> Vec<&'a str> {
+    headers
+        .iter()
+        .filter(|(header_name, _)| header_name.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
+        .collect()
+}
+
+async fn read_http_request(stream: &mut tokio::net::TcpStream) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    let mut chunk = [0u8; 1024];
+
+    loop {
+        let read = stream.read(&mut chunk).await.unwrap();
+        if read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+    }
+
+    buffer
+}
+
+async fn write_chunk(stream: &mut tokio::net::TcpStream, payload: &[u8]) {
+    let header = format!("{:X}\r\n", payload.len());
+    stream.write_all(header.as_bytes()).await.unwrap();
+    stream.write_all(payload).await.unwrap();
+    stream.write_all(b"\r\n").await.unwrap();
 }

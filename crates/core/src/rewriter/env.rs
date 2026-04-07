@@ -1,13 +1,13 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use rand::Rng;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::config::{Config, EnvConfig, ProcessConfig};
 
 /// Build canonical env from loaded Config.
 /// Returns the full canonical profile env map (40+ keys) if available,
-/// otherwise falls back to legacy fixed 21-field construction.
+/// otherwise serializes the full inline env config map.
 pub fn build_canonical_env_from_config(config: &Config) -> Value {
     if let Some(ref profile) = config.canonical_profile {
         return Value::Object(
@@ -22,32 +22,9 @@ pub fn build_canonical_env_from_config(config: &Config) -> Value {
     build_canonical_env_from_env_config(&config.env)
 }
 
-/// Legacy: build canonical env from EnvConfig (fixed 21 fields).
-/// Retained for backward compatibility and testing.
+/// Build canonical env from EnvConfig, preserving any flattened extra keys.
 pub fn build_canonical_env_from_env_config(env: &EnvConfig) -> Value {
-    json!({
-        "platform": env.platform,
-        "platform_raw": env.platform_raw,
-        "arch": env.arch,
-        "node_version": env.node_version,
-        "terminal": env.terminal,
-        "package_managers": env.package_managers,
-        "runtimes": env.runtimes,
-        "is_running_with_bun": env.is_running_with_bun,
-        "is_ci": false,
-        "is_claubbit": false,
-        "is_claude_code_remote": false,
-        "is_local_agent_mode": false,
-        "is_conductor": false,
-        "is_github_action": false,
-        "is_claude_code_action": false,
-        "is_claude_ai_auth": env.is_claude_ai_auth,
-        "version": env.version,
-        "version_base": env.version_base,
-        "build_time": env.build_time,
-        "deployment_environment": env.deployment_environment,
-        "vcs": env.vcs,
-    })
+    serde_json::to_value(env).expect("env config should serialize")
 }
 
 /// Rewrite event_data.env using the canonical env map from Config.
@@ -136,6 +113,7 @@ mod tests {
         AuthConfig, Config, EnvConfig, IdentityConfig, LoggingConfig, OAuthConfig, PromptEnvConfig,
         ServerConfig, TokenEntry, UpstreamConfig,
     };
+    use serde_json::json;
     use std::collections::HashMap;
 
     fn env_config() -> EnvConfig {
@@ -161,6 +139,7 @@ mod tests {
             build_time: "2026-03-20T21:26:18Z".to_string(),
             deployment_environment: "unknown-darwin".to_string(),
             vcs: "git".to_string(),
+            extra: HashMap::new(),
         }
     }
 
@@ -305,13 +284,19 @@ mod tests {
         assert_eq!(canonical["package_managers"], env.package_managers);
         assert_eq!(canonical["runtimes"], env.runtimes);
         assert_eq!(canonical["is_running_with_bun"], env.is_running_with_bun);
-        assert_eq!(canonical["is_ci"], false);
-        assert_eq!(canonical["is_claubbit"], false);
-        assert_eq!(canonical["is_claude_code_remote"], false);
-        assert_eq!(canonical["is_local_agent_mode"], false);
-        assert_eq!(canonical["is_conductor"], false);
-        assert_eq!(canonical["is_github_action"], false);
-        assert_eq!(canonical["is_claude_code_action"], false);
+        assert_eq!(canonical["is_ci"], env.is_ci);
+        assert_eq!(canonical["is_claubbit"], env.is_claubbit);
+        assert_eq!(
+            canonical["is_claude_code_remote"],
+            env.is_claude_code_remote
+        );
+        assert_eq!(canonical["is_local_agent_mode"], env.is_local_agent_mode);
+        assert_eq!(canonical["is_conductor"], env.is_conductor);
+        assert_eq!(canonical["is_github_action"], env.is_github_action);
+        assert_eq!(
+            canonical["is_claude_code_action"],
+            env.is_claude_code_action
+        );
         assert_eq!(canonical["is_claude_ai_auth"], env.is_claude_ai_auth);
         assert_eq!(canonical["version"], env.version);
         assert_eq!(canonical["version_base"], env.version_base);
@@ -332,10 +317,27 @@ mod tests {
         assert_eq!(
             object.len(),
             21,
-            "Legacy inline config must yield exactly 21 fields"
+            "Inline config without extra keys must preserve the typed env fields"
         );
         assert_eq!(canonical["platform"], "darwin");
         assert_eq!(canonical["arch"], "arm64");
+    }
+
+    #[test]
+    fn builds_canonical_env_from_config_with_inline_extra_keys() {
+        let mut config = legacy_config();
+        config.env.extra.insert("shell".to_string(), json!("zsh"));
+        config
+            .env
+            .extra
+            .insert("timezone".to_string(), json!("Asia/Shanghai"));
+
+        let canonical = build_canonical_env_from_config(&config);
+        let object = canonical.as_object().unwrap();
+
+        assert_eq!(object.len(), 23);
+        assert_eq!(canonical["shell"], "zsh");
+        assert_eq!(canonical["timezone"], "Asia/Shanghai");
     }
 
     #[test]
@@ -372,11 +374,11 @@ mod tests {
         assert_eq!(
             env_obj.len(),
             21,
-            "Legacy config event rewrite must yield 21 fields"
+            "Inline config without extra keys must preserve the typed env fields"
         );
         assert_eq!(event_data["env"]["platform"], "darwin");
         assert_eq!(event_data["env"]["arch"], "arm64");
-        assert_eq!(event_data["env"]["is_ci"], false);
+        assert_eq!(event_data["env"]["is_ci"], true);
     }
 
     #[test]

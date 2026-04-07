@@ -15,7 +15,7 @@ pub const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 pub const SCOPES: &str =
     "user:inference user:profile user:sessions:claude_code user:mcp_servers user:file_upload";
 
-const MIN_REFRESH_DELAY: Duration = Duration::from_secs(10);
+const MIN_REFRESH_DELAY: Duration = Duration::from_secs(1);
 const RETRY_DELAY: Duration = Duration::from_secs(30);
 
 #[derive(Debug)]
@@ -382,11 +382,16 @@ mod tests {
             Duration::from_secs(600)
         );
 
-        // MIN_REFRESH_DELAY is honored when expiry is too close
+        // TS parity: use actual expiry delay unless it falls below the 1s floor
         assert_eq!(
             refresh_delay(now, now + ChronoDuration::seconds(5)),
+            Duration::from_secs(5)
+        );
+        assert_eq!(
+            refresh_delay(now, now + ChronoDuration::milliseconds(250)),
             MIN_REFRESH_DELAY
         );
+        assert_eq!(MIN_REFRESH_DELAY, Duration::from_secs(1));
     }
 
     #[test]

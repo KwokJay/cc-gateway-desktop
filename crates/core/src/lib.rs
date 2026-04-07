@@ -20,5 +20,6 @@ pub use rewriter::identity::{
     rewrite_recursive_identity,
 };
 pub use rewriter::prompt::{
-    compute_cch, rewrite_prompt_text, rewrite_system_reminders, strip_billing_header,
+    compute_cch, rewrite_prompt_text, rewrite_prompt_text_with_hash, rewrite_system_reminders,
+    strip_billing_header,
 };

@@ -33,6 +33,10 @@ pub fn rewrite_messages_metadata(body: &mut Value, identity: &IdentityConfig) {
         Value::String(identity.account_uuid.clone()),
     );
 
+    if user_id_object.contains_key("email") {
+        user_id_object.insert("email".to_string(), Value::String(identity.email.clone()));
+    }
+
     user_id_object.insert(
         "session_id".to_string(),
         Value::String(identity.session_id.clone()),
@@ -153,6 +157,29 @@ mod tests {
         assert_eq!(user_id["device_id"], identity.device_id);
         assert_eq!(user_id["account_uuid"], identity.account_uuid);
         assert_eq!(user_id["session_id"], identity.session_id);
+    }
+
+    #[test]
+    fn rewrites_metadata_user_id_email_when_present() {
+        let identity = identity_config();
+        let mut body = json!({
+            "metadata": {
+                "user_id": serde_json::to_string(&json!({
+                    "device_id": "original_device_id",
+                    "email": "original@example.com",
+                    "account_uuid": "acct-123",
+                    "session_id": "sess-456"
+                }))
+                .unwrap()
+            }
+        });
+
+        rewrite_messages_metadata(&mut body, &identity);
+
+        let user_id =
+            serde_json::from_str::<Value>(body["metadata"]["user_id"].as_str().unwrap()).unwrap();
+
+        assert_eq!(user_id["email"], identity.email);
     }
 
     #[test]

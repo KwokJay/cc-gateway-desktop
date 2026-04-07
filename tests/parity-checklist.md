@@ -25,6 +25,7 @@ This checklist maps the TypeScript source-of-truth tests in `tests/*.ts` to the 
 - [x] Billing header is stripped from system payloads — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`, `crates/core/src/rewriter/prompt.rs`
 - [x] Event batch env/process identity rewrites preserve canonical shape — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`, `crates/core/src/rewriter/env.rs`
 - [x] Sensitive inbound headers are stripped and user-agent is normalized — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`, `crates/core/src/rewriter/headers.rs`
+- [x] Repeated request headers are coalesced into a single comma-separated value — `crates/daemon/tests/daemon.rs`, `crates/core/src/rewriter/headers.rs`
 - [x] Non-JSON bodies pass through unchanged — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`
 - [x] Generic `/policy_limits` payload identity is rewritten — `tests/rewriter.test.ts` -> `crates/daemon/tests/daemon.rs`, `crates/core/src/rewriter/identity.rs`
 - [x] Generic `/settings` payload identity is rewritten — behaviorally paired with `/policy_limits` in `crates/daemon/tests/daemon.rs`

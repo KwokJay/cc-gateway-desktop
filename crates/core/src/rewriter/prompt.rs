@@ -9,9 +9,23 @@ const CCH_SALT: &str = "59cf53e54c78";
 const CCH_POSITIONS: [usize; 3] = [4, 7, 20];
 
 pub fn rewrite_prompt_text(text: &str, prompt_env: &PromptEnvConfig) -> String {
+    rewrite_prompt_text_with_hash(text, prompt_env, None, None)
+}
+
+pub fn rewrite_prompt_text_with_hash(
+    text: &str,
+    prompt_env: &PromptEnvConfig,
+    version: Option<&str>,
+    hash: Option<&str>,
+) -> String {
     let mut rewritten = platform_regex()
         .replace_all(text, format!("Platform: {}", prompt_env.platform))
         .into_owned();
+    if let (Some(version), Some(hash)) = (version, hash) {
+        rewritten = cc_version_regex()
+            .replace_all(&rewritten, format!("cc_version={version}.{hash}"))
+            .into_owned();
+    }
     rewritten = shell_regex()
         .replace_all(&rewritten, format!("Shell: {}", prompt_env.shell))
         .into_owned();
@@ -110,6 +124,11 @@ fn billing_header_regex() -> &'static Regex {
     REGEX.get_or_init(|| Regex::new(r"x-anthropic-billing-header:[^\n]+\n?").unwrap())
 }
 
+fn cc_version_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r"cc_version=[\d.]+\.[a-f0-9]{3}").unwrap())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +196,17 @@ mod tests {
             compute_cch("hello from canonical user message", "2.1.81"),
             "0ea"
         );
+    }
+
+    #[test]
+    fn rewrites_cc_version_when_hash_is_available() {
+        let rewritten = rewrite_prompt_text_with_hash(
+            "x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=cli;",
+            &prompt_env(),
+            Some("2.2.0"),
+            Some("abc"),
+        );
+
+        assert!(rewritten.contains("cc_version=2.2.0.abc"));
     }
 }

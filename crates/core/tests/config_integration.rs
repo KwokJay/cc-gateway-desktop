@@ -234,6 +234,13 @@ fn test_canonical_profile_loads_and_overrides() {
         "Expected at least 40 env keys, got {}",
         profile.env.len()
     );
+    let rewrite_policy = profile
+        .rewrite_policy
+        .expect("canonical profile should preserve rewrite_policy metadata");
+    assert_eq!(rewrite_policy.mode.as_deref(), Some("aggressive"));
+    assert_eq!(rewrite_policy.strip_billing_header, Some(true));
+    assert_eq!(rewrite_policy.normalize_timestamps, Some(false));
+    assert_eq!(rewrite_policy.preserve_fields, Some(Vec::new()));
 }
 
 #[test]

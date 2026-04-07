@@ -1,7 +1,9 @@
 use std::net::SocketAddr;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
 use axum::body::{to_bytes, Body};
+use axum::extract::ConnectInfo;
 use axum::extract::{OriginalUri, State};
 use axum::http::{header::CONTENT_TYPE, HeaderMap, Method, Response, StatusCode};
 use axum::response::IntoResponse;
@@ -10,8 +12,8 @@ use axum::{Json, Router};
 use base64::Engine;
 use ccgw_core::{
     rewrite_event_env, rewrite_event_identity, rewrite_event_process, rewrite_generic_identity,
-    rewrite_headers, rewrite_messages_metadata, rewrite_prompt_text, rewrite_recursive_identity,
-    rewrite_system_reminders, AuthManager, Config, OAuthManager,
+    rewrite_headers, rewrite_messages_metadata, rewrite_prompt_text_with_hash,
+    rewrite_recursive_identity, rewrite_system_reminders, AuthManager, Config, OAuthManager,
 };
 use reqwest::{Client, Proxy};
 use serde_json::{json, Value};
@@ -23,6 +25,7 @@ struct AppState {
     config: Config,
     auth: AuthManager,
     oauth: OAuthManager,
+    oauth_init_error: Option<String>,
     upstream: Url,
     client: Client,
 }
@@ -31,16 +34,33 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
     let state = build_state(config).await?;
     let port = state.config.server.port;
     let app = router(state.clone());
-    let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
-        .await
-        .context("failed to bind daemon listener")?;
-    let local_addr = listener.local_addr().context("failed to read local addr")?;
+    let service = app.into_make_service_with_connect_info::<SocketAddr>();
 
-    log_startup(&state, local_addr);
+    if let Some(tls) = &state.config.server.tls {
+        let local_addr = SocketAddr::from(([0, 0, 0, 0], port));
+        let rustls_config =
+            axum_server::tls_rustls::RustlsConfig::from_pem_file(&tls.cert, &tls.key)
+                .await
+                .context("failed to load daemon TLS cert/key")?;
 
-    axum::serve(listener, app)
-        .await
-        .context("daemon server exited unexpectedly")
+        log_startup(&state, local_addr, true);
+
+        axum_server::bind_rustls(local_addr, rustls_config)
+            .serve(service)
+            .await
+            .context("daemon TLS server exited unexpectedly")
+    } else {
+        let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
+            .await
+            .context("failed to bind daemon listener")?;
+        let local_addr = listener.local_addr().context("failed to read local addr")?;
+
+        log_startup(&state, local_addr, false);
+
+        axum::serve(listener, service)
+            .await
+            .context("daemon server exited unexpectedly")
+    }
 }
 
 pub async fn build_app(config: Config) -> anyhow::Result<Router> {
@@ -49,9 +69,14 @@ pub async fn build_app(config: Config) -> anyhow::Result<Router> {
 
 async fn build_state(config: Config) -> anyhow::Result<AppState> {
     let oauth = OAuthManager::from_config(&config.oauth)?;
-    if let Err(error) = oauth.init().await {
-        warn!("OAuth initialization degraded: {error:#}");
-    }
+    let oauth_init_error = match oauth.init().await {
+        Ok(()) => None,
+        Err(error) => {
+            let detail = format!("{error:#}");
+            warn!("OAuth initialization degraded: {detail}");
+            Some(detail)
+        }
+    };
 
     let upstream = Url::parse(&config.upstream.url).context("invalid upstream url")?;
     let client = build_client()?;
@@ -61,6 +86,7 @@ async fn build_state(config: Config) -> anyhow::Result<AppState> {
         config,
         auth,
         oauth,
+        oauth_init_error,
         upstream,
         client,
     })
@@ -75,9 +101,13 @@ fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
-fn log_startup(state: &AppState, local_addr: SocketAddr) {
+fn log_startup(state: &AppState, local_addr: SocketAddr, tls_enabled: bool) {
     info!("CC Gateway Daemon starting");
-    info!("CC Gateway listening on http://{}", local_addr);
+    info!(
+        "CC Gateway listening on {}://{}",
+        if tls_enabled { "https" } else { "http" },
+        local_addr
+    );
     info!("Upstream: {}", state.config.upstream.url);
     info!(
         "Canonical device_id: {}...",
@@ -100,6 +130,15 @@ fn log_startup(state: &AppState, local_addr: SocketAddr) {
             .collect::<Vec<_>>()
             .join(", ")
     );
+    if let Some(policy) = state.config.rewrite_policy() {
+        warn!(
+            mode = policy.mode.as_deref().unwrap_or("unset"),
+            strip_billing_header = policy.strip_billing_header.unwrap_or(false),
+            normalize_timestamps = policy.normalize_timestamps.unwrap_or(false),
+            preserve_fields = policy.preserve_fields.as_ref().map_or(0, Vec::len),
+            "Canonical profile rewrite_policy is informational only; runtime request rewriting does not apply it yet"
+        );
+    }
 }
 
 fn build_client() -> anyhow::Result<Client> {
@@ -139,6 +178,16 @@ async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
         Json(json!({
             "status": if oauth_ok { "ok" } else { "degraded" },
             "oauth": if oauth_ok { "valid" } else { "expired/refreshing" },
+            "oauth_detail": if oauth_ok {
+                None::<String>
+            } else {
+                Some(
+                    state
+                        .oauth_init_error
+                        .clone()
+                        .unwrap_or_else(|| "expired/refreshing".to_string())
+                )
+            },
             "canonical_device": format!(
                 "{}...",
                 state.config.identity.device_id.chars().take(8).collect::<String>()
@@ -148,6 +197,7 @@ async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
                 .get_env_value("platform")
                 .and_then(Value::as_str)
                 .unwrap_or(&state.config.env.platform),
+            "rewrite_policy": rewrite_policy_health(&state.config),
             "upstream": state.config.upstream.url,
             "clients": state
                 .config
@@ -158,6 +208,24 @@ async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
                 .collect::<Vec<_>>(),
         })),
     )
+}
+
+fn rewrite_policy_health(config: &Config) -> Value {
+    match config.rewrite_policy() {
+        Some(policy) => json!({
+            "configured": true,
+            "effective": false,
+            "mode": policy.mode,
+            "strip_billing_header": policy.strip_billing_header,
+            "normalize_timestamps": policy.normalize_timestamps,
+            "preserve_fields": policy.preserve_fields,
+            "detail": "canonical_profile.rewrite_policy is parsed but not applied by runtime yet"
+        }),
+        None => json!({
+            "configured": false,
+            "effective": false
+        }),
+    }
 }
 
 async fn verify_handler(State(state): State<AppState>, headers: HeaderMap) -> Response<Body> {
@@ -179,6 +247,7 @@ async fn verify_handler(State(state): State<AppState>, headers: HeaderMap) -> Re
 
 async fn proxy_handler(
     State(state): State<AppState>,
+    ConnectInfo(remote_addr): ConnectInfo<SocketAddr>,
     method: Method,
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
@@ -189,6 +258,8 @@ async fn proxy_handler(
         .map(|value| value.as_str())
         .unwrap_or("/")
         .to_string();
+
+    info!("← {} {} from {}", method, path, remote_addr.ip());
 
     let Some(client_name) = state.auth.authenticate(&headers) else {
         warn!("Unauthorized request: {} {}", method, path);
@@ -265,13 +336,6 @@ async fn proxy_handler(
 
     let status = upstream_response.status();
     let response_headers = upstream_response.headers().clone();
-    let response_bytes = match upstream_response.bytes().await {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            error!("Failed reading upstream response: {err}");
-            return json_error(StatusCode::BAD_GATEWAY, "Failed to read upstream response");
-        }
-    };
 
     if state.config.logging.audit {
         tracing::info!(
@@ -293,7 +357,7 @@ async fn proxy_handler(
     }
 
     builder
-        .body(Body::from(response_bytes))
+        .body(Body::from_stream(upstream_response.bytes_stream()))
         .unwrap_or_else(|_| json_error(StatusCode::BAD_GATEWAY, "Failed to build response"))
 }
 
@@ -318,6 +382,7 @@ fn build_verification_payload(config: &Config) -> anyhow::Result<Value> {
         "metadata": {
             "user_id": serde_json::to_string(&json!({
                 "device_id": "REAL_DEVICE_ID_FROM_CLIENT_abc123",
+                "email": "real@example.com",
                 "account_uuid": "real-account-uuid",
                 "session_id": "real-session-xxx"
             }))?,
@@ -392,26 +457,72 @@ fn rewrite_messages_body(body: &mut Value, config: &Config) {
         }
     }
 
+    let version = config
+        .get_env_value("version")
+        .and_then(Value::as_str)
+        .unwrap_or(&config.env.version);
+    let hash = extract_first_user_message_text(body)
+        .filter(|text| !text.is_empty())
+        .map(|text| ccgw_core::compute_cch(&text, version))
+        .unwrap_or_else(fallback_cch_hash);
+
     if let Some(system) = body.get_mut("system") {
-        rewrite_system_body(system, config);
+        rewrite_system_body(system, config, version, Some(hash.as_str()));
     }
 }
 
-fn rewrite_system_body(system: &mut Value, config: &Config) {
+fn rewrite_system_body(system: &mut Value, config: &Config, version: &str, hash: Option<&str>) {
     match system {
         Value::Array(items) => {
             items.retain(|item| !system_item_is_billing_only(item));
             for item in items {
                 rewrite_text_container(Some(item), |text| {
-                    rewrite_prompt_text(&strip_billing_header_block(text), &config.prompt_env)
+                    rewrite_prompt_text_with_hash(
+                        &strip_billing_header_block(text),
+                        &config.prompt_env,
+                        Some(version),
+                        hash,
+                    )
                 });
             }
         }
         Value::String(text) => {
-            *text = rewrite_prompt_text(&strip_billing_header_block(text), &config.prompt_env);
+            *text = rewrite_prompt_text_with_hash(
+                &strip_billing_header_block(text),
+                &config.prompt_env,
+                Some(version),
+                hash,
+            );
         }
         _ => {}
     }
+}
+
+fn extract_first_user_message_text(body: &Value) -> Option<String> {
+    let messages = body.get("messages")?.as_array()?;
+    let first_user = messages
+        .iter()
+        .find(|message| message.get("role").and_then(Value::as_str) == Some("user"))?;
+
+    match first_user.get("content")? {
+        Value::String(text) => Some(text.to_string()),
+        Value::Array(items) => items.iter().find_map(|item| {
+            (item.get("type").and_then(Value::as_str) == Some("text"))
+                .then(|| item.get("text").and_then(Value::as_str))
+                .flatten()
+                .map(str::to_owned)
+        }),
+        _ => None,
+    }
+}
+
+fn fallback_cch_hash() -> String {
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos()
+        & 0x0fff;
+    format!("{seed:03x}")
 }
 
 fn rewrite_event_batch(body: &mut Value, config: &Config) {
@@ -692,6 +803,7 @@ mod tests {
             "metadata": {
                 "user_id": serde_json::to_string(&json!({
                     "device_id": "real-device",
+                    "email": "real@example.com",
                     "account_uuid": "acct"
                 })).unwrap()
             },
@@ -715,6 +827,7 @@ mod tests {
         let metadata: Value =
             serde_json::from_str(rewritten["metadata"]["user_id"].as_str().unwrap()).unwrap();
         assert_eq!(metadata["device_id"], "canonical-device-id");
+        assert_eq!(metadata["email"], "canonical@example.com");
         assert_eq!(rewritten["system"].as_array().unwrap().len(), 1);
         assert!(rewritten["system"][0]["text"]
             .as_str()
@@ -724,6 +837,30 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("/Users/canonical/project"));
+    }
+
+    #[test]
+    fn rewrites_inline_cc_version_after_computing_cch_from_first_user_message() {
+        let config = test_config();
+        let body = json!({
+            "system": "x-anthropic-billing-header: cc_version=2.1.81.a1b;\ncache marker cc_version=2.1.81.a1b;\nWorking directory: /home/bob/src",
+            "messages": [{
+                "role": "user",
+                "content": "hello from canonical user message"
+            }]
+        });
+
+        let rewritten: Value = serde_json::from_slice(&rewrite_request_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &config,
+        ))
+        .unwrap();
+
+        let system = rewritten["system"].as_str().unwrap();
+        assert!(!system.contains("x-anthropic-billing-header"));
+        assert!(system.contains("cc_version=2.1.81.0ea"));
+        assert!(system.contains("/Users/canonical/project"));
     }
 
     #[test]
@@ -927,6 +1064,60 @@ mod tests {
             assert_eq!(token, None);
             assert_eq!(requests.lock().unwrap().len(), 1);
         });
+    }
+
+    #[test]
+    fn health_endpoint_surfaces_degraded_startup_detail() {
+        tokio_test::block_on(async {
+            let response = health_handler(State(test_app_state(None, Some("refresh failed"))))
+                .await
+                .into_response();
+
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+            let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            let payload: Value = serde_json::from_slice(&body).unwrap();
+
+            assert_eq!(payload["status"], "degraded");
+            assert_eq!(payload["oauth"], "expired/refreshing");
+            assert_eq!(payload["oauth_detail"], "refresh failed");
+        });
+    }
+
+    #[test]
+    fn health_endpoint_omits_oauth_detail_when_oauth_is_ready() {
+        tokio_test::block_on(async {
+            let response = health_handler(State(test_app_state(Some("oauth-access"), None)))
+                .await
+                .into_response();
+
+            assert_eq!(response.status(), StatusCode::OK);
+
+            let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            let payload: Value = serde_json::from_slice(&body).unwrap();
+
+            assert_eq!(payload["status"], "ok");
+            assert_eq!(payload["oauth"], "valid");
+            assert!(payload["oauth_detail"].is_null());
+        });
+    }
+
+    fn test_app_state(access_token: Option<&str>, oauth_init_error: Option<&str>) -> AppState {
+        let config = test_config();
+
+        AppState {
+            auth: AuthManager::new(config.auth.tokens.clone()),
+            oauth: OAuthManager::new(
+                access_token.map(ToOwned::to_owned),
+                config.oauth.refresh_token.clone(),
+                access_token.map(|_| Utc::now() + ChronoDuration::minutes(10)),
+            )
+            .unwrap(),
+            oauth_init_error: oauth_init_error.map(ToOwned::to_owned),
+            upstream: Url::parse(&config.upstream.url).unwrap(),
+            client: Client::new(),
+            config,
+        }
     }
 
     async fn spawn_mock_server(

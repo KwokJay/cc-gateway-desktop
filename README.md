@@ -144,12 +144,15 @@ ccg help                  Show help
 | **Headers** | `User-Agent` | → canonical CC version |
 | | `x-api-key` | → real OAuth token (injected by gateway) |
 | | `x-anthropic-billing-header` | → stripped |
+| | repeated request header values | → coalesced into one comma-separated value (TS parity) |
 | **Prompt text** | `Platform`, `Shell`, `OS Version` | → canonical values |
 | | `Working directory` | → canonical path |
 | | `/Users/xxx/`, `/home/xxx/` | → canonical home prefix |
 | **Billing** | `x-anthropic-billing-header` system block | → stripped entirely |
 | **Leak fields** | `baseUrl` (ANTHROPIC_BASE_URL) | → stripped |
 | | `gateway` (provider detection) | → stripped |
+
+`canonical_profile.rewrite_policy` metadata is preserved, surfaced through `/_health`, and logged at startup when present. It is still informational only: runtime request rewriting does not honor it yet.
 
 ## Deployment
 

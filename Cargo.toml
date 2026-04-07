@@ -22,7 +22,7 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 
 # HTTP client/server
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls", "stream"] }
 axum = { version = "0.7", features = ["macros"] }
 hyper = { version = "1.2", features = ["full"] }
 hyper-util = "0.1"
