@@ -4,7 +4,7 @@
 
 CC Gateway is a privacy-preserving reverse proxy and local tooling stack for Claude Code. It routes Claude traffic through a single controllable gateway that rewrites identity, environment, prompt, and process telemetry to a canonical profile, with Rust daemon, CLI, and desktop surfaces for operators who want predictable behavior across machines.
 
-The current codebase is a brownfield monorepo: a legacy TypeScript gateway remains as the behavioral reference while the Rust daemon, CLI, and Tauri desktop app are becoming the long-term product surface.
+The current codebase is a brownfield monorepo: a legacy TypeScript gateway remains as the behavioral reference while the Rust daemon, CLI, and Tauri desktop app are becoming the long-term product surface. This milestone adds a separate standalone bootstrap CLI derived from the TypeScript backend's setup and launch behaviors, without rewriting the existing TypeScript or Rust products.
 
 ## Core Value
 
@@ -22,25 +22,27 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 
 ### Active
 
-- [ ] Make the Rust daemon + desktop control plane reliable enough for daily use without stale health state or fragile restart flows
-- [ ] Reduce secret and deployment metadata leakage from health, config, and desktop management surfaces
-- [ ] Make local configuration writes and daemon lifecycle handling safe under failure conditions
-- [ ] Expand automated verification so parity-critical rewrite behavior and desktop operational paths are covered by default
-- [ ] Clarify the long-term source of truth between the Rust implementation and the legacy TypeScript gateway
+- [ ] Inventory the full TypeScript backend feature surface that matters to local bootstrap, auth, config, rewrite, and launch flows
+- [ ] Build a new standalone CLI that can detect local Claude Code credentials and construct a usable local working environment
+- [ ] Launch the locally installed `claude` executable automatically after bootstrap succeeds, with the required gateway-oriented environment variables
+- [ ] Keep the existing TypeScript gateway, Rust daemon, Rust CLI, and desktop app unchanged while the new CLI is developed in an isolated path
+- [ ] Add verification and operator guidance for first-run bootstrap, repeat-run idempotency, and launch failure handling
 
 ### Out of Scope
 
-- Supporting non-Anthropic upstream providers in this milestone — the current product value is Claude/Anthropic-specific control and parity
-- Building a hosted multi-tenant control plane or cloud dashboard — this project is currently local/self-hosted operator software
-- Replacing file-based local configuration with a database-backed management service — not necessary for the current deployment model
-- Mobile companion apps — not required to deliver the gateway’s core operator value
+- Modifying or replacing the existing TypeScript gateway, Rust daemon, Rust CLI, or desktop app in this milestone — the user explicitly wants those surfaces kept intact
+- Turning the new CLI into a desktop or hosted management surface — this milestone is terminal-first local bootstrap and launch
+- Supporting non-Anthropic upstream providers — the requested bootstrap flow still targets Claude Code and Anthropic credentials
+- Building remote multi-user client provisioning workflows — this milestone is about one machine preparing and launching its own Claude Code environment
 
 ## Context
 
 - The project already ships meaningful functionality and is not starting from scratch. Brownfield analysis in `.planning/codebase/` shows working launcher flows, rewrite logic, centralized OAuth handling, and multiple runtime surfaces.
 - The README positions the product around telemetry control: canonical identity rewriting, billing-header stripping, prompt sanitization, and proxy-aware centralized OAuth.
 - The most important implementation tension is architectural drift: `src/` still contains a runnable TypeScript gateway while `crates/core` + `crates/daemon` now hold the production-oriented path. That duplication increases parity and test burden.
-- The desktop app is strategically important because it makes gateway operations accessible, but current codebase concerns highlight stale process state, TLS health-check mismatches, secret exposure to the renderer, and risky config-save behavior.
+- The standalone bootstrap CLI request is anchored in the existing TypeScript backend behavior, especially `src/index.ts`, `src/config.ts`, `src/proxy.ts`, `src/oauth.ts`, `src/rewriter.ts`, `scripts/quick-setup.sh`, and `scripts/add-client.sh`.
+- The new milestone is not asking for another control plane rewrite. It asks for a fresh CLI surface that absorbs the useful TypeScript bootstrap and launch behaviors, prepares a local Claude Code environment, and then launches the installed `claude` binary.
+- The existing Rust CLI already proves the repository wants a launcher surface, but it does not currently perform the one-shot local environment detection and construction requested here.
 - Existing docs in `docs/rust-ts-parity-checklist.md` indicate parity work is ongoing and should remain a first-class planning input.
 
 ## Constraints
@@ -59,6 +61,19 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 | Treat the current planning effort as a stabilization + hardening milestone | The clearest repo risks are operational trust, secret handling, lifecycle safety, and parity drift, not missing greenfield feature discovery | — Pending |
 | Use recommended GSD defaults with planning docs committed to git | The user asked to proceed without friction, and committed planning artifacts make future sessions reproducible despite `.planning/` being gitignored by default | ✓ Good |
 | Keep the TypeScript gateway as a reference surface until Rust parity and coverage are explicit | Immediate deletion would be risky while parity work is still documented as active | ⚠️ Revisit |
+| Start milestone v1.1 around a standalone bootstrap CLI derived from the TypeScript backend | The user explicitly wants the TypeScript app analyzed and a new CLI built from its core behaviors | — Pending |
+| Keep legacy TypeScript and Rust program codepaths unchanged while building the new CLI | The new work should add an isolated surface, not destabilize the existing products | ✓ Good |
+| Continue roadmap numbering at Phase 5 for the new milestone | Preserves planning history instead of silently resetting prior roadmap numbering | ✓ Good |
+
+## Current Milestone: v1.1 Standalone Claude Bootstrap CLI
+
+**Goal:** Extract the useful TypeScript backend bootstrap and launch behaviors into a new standalone CLI that can prepare a local Claude Code environment and then launch the installed `claude` executable, without changing the existing TypeScript or Rust programs.
+
+**Target features:**
+- Analyze the TypeScript backend's runtime, setup, auth, config, and launch capabilities and classify what the new CLI must preserve
+- Detect local Claude Code credentials from supported sources and build the local bootstrap artifacts needed for a gateway-backed session
+- Prepare or start the local runtime state needed by the bootstrap flow, then launch the installed `claude` binary automatically
+- Keep the existing TypeScript gateway, Rust daemon, Rust CLI, and desktop app untouched while documenting the new CLI's boundary
 
 ## Evolution
 
@@ -78,4 +93,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after initialization*
+*Last updated: 2026-04-08 after starting milestone v1.1*

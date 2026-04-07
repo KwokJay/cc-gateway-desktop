@@ -2,76 +2,87 @@
 
 ## Overview
 
-This milestone hardens an already-working CC Gateway codebase so operators can trust the Rust daemon and desktop control plane for daily use. The roadmap follows the existing brownfield risk shape: first make desktop operations and config handling trustworthy, then reduce secret exposure, then harden Rust gateway parity and request guardrails, and finally make default verification catch regressions before release.
+Milestone v1.1 shifts the active planning focus from the earlier hardening-only roadmap to a standalone bootstrap CLI derived from the existing TypeScript backend. The CLI must inventory the TypeScript behavior it depends on, construct a local Claude Code working environment, prepare the runtime state needed for that environment, and then launch the installed `claude` executable without modifying the existing TypeScript or Rust programs.
+
+Phase numbering continues from the prior roadmap, so this milestone begins at Phase 5.
 
 ## Phases
 
 **Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+- Integer phases (5, 6, 7): Planned milestone work
+- Decimal phases (6.1, 6.2): Urgent insertions (marked with INSERTED)
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Desktop Control Plane Reliability** - Make daemon supervision, health checks, and config saves trustworthy for everyday desktop operations.
-- [ ] **Phase 2: Secret-Safe Operator Surfaces** - Reduce accidental exposure of tokens, proxy details, and management data across daemon and desktop surfaces.
-- [ ] **Phase 3: Rust Gateway Parity Guardrails** - Harden the Rust gateway path so rewrite behavior and request safety stay predictable.
-- [ ] **Phase 4: Verification Baseline for Hardening** - Make default verification prove the hardening work across gateway, config, and desktop flows.
+- [ ] **Phase 5: TS Backend Capability Inventory** - Inventory the TypeScript backend feature surface and lock the boundary for the new standalone CLI.
+- [ ] **Phase 6: Standalone CLI Scaffold & Credential Discovery** - Create an isolated CLI entrypoint and detect supported local Claude credential sources safely.
+- [ ] **Phase 7: Local Environment Construction & Runtime Preparation** - Build or reuse bootstrap artifacts and prepare the runtime state required before launch.
+- [ ] **Phase 8: Claude Launch Handoff** - Launch the installed `claude` executable through the prepared environment with full argument passthrough and failure handling.
+- [ ] **Phase 9: Validation & Operator Guidance** - Add tests and operator documentation that make the new CLI repeatable and supportable.
 
 ## Phase Details
 
-### Phase 1: Desktop Control Plane Reliability
-**Goal**: Operators can trust the desktop app to reflect real daemon state, recover from failures, and save config safely without losing the last known-good setup.
-**Depends on**: Nothing (first phase)
-**Requirements**: OPS-01, OPS-02, OPS-03, CFG-01, CFG-02
+### Phase 5: TS Backend Capability Inventory
+**Goal**: The repository has an auditable inventory of the TypeScript backend capabilities that the new CLI must preserve, plus a clear isolation boundary that keeps existing TS and Rust codepaths unchanged.
+**Depends on**: Nothing (first phase in this milestone)
+**Requirements**: ANA-01, ANA-02, ISO-01
 **Success Criteria** (what must be TRUE):
-  1. Operator sees running, stopped, and crashed daemon states in the desktop dashboard that match the real managed process.
-  2. Operator can start or recover the daemon from the desktop app for both HTTP and TLS local configurations without stale "running" status.
-  3. Saving config from the desktop app either preserves the new valid config atomically or leaves the prior working config intact.
-  4. Invalid config edits surface actionable validation errors and do not corrupt the saved config file or running daemon state.
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 2: Secret-Safe Operator Surfaces
-**Goal**: Operators can inspect and manage the gateway without leaking secrets or unintentionally exposing admin-only data.
-**Depends on**: Phase 1
-**Requirements**: SEC-01, SEC-02, SEC-03
-**Success Criteria** (what must be TRUE):
-  1. Health and management surfaces can hide or protect upstream, client, and canonical-identity details from unauthenticated callers.
-  2. The desktop UI shows redacted config and proxy values by default and only reveals raw secrets during explicit targeted edit flows.
-  3. Local and desktop-first installs default to loopback-safe exposure or show a clear warning before serving plaintext gateway traffic on non-local interfaces.
-  4. Operator can tell from the product surfaces when the gateway is in a locally safe mode versus a remotely exposed mode.
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 3: Rust Gateway Parity Guardrails
-**Goal**: Operators can rely on the Rust daemon as the primary gateway path without rewrite drift or unsafe request buffering surprises.
-**Depends on**: Phase 1
-**Requirements**: GW-01, GW-02, GW-03
-**Success Criteria** (what must be TRUE):
-  1. Claude Code traffic routed through the Rust daemon streams successfully while identity, header, prompt, and metadata rewrites match documented parity expectations.
-  2. Oversized rewrite-eligible request bodies are rejected or safely bounded instead of causing runaway memory use or unpredictable proxy behavior.
-  3. Any remaining differences between the Rust and TypeScript gateways are visible through tests or compatibility documentation before operators depend on the Rust path.
+  1. The TypeScript backend's runtime, setup, auth, config, and launch capabilities are documented from source files and scripts rather than assumed.
+  2. Each analyzed capability is classified as must-port, reference-only, or deferred for the new CLI milestone.
+  3. The milestone records an explicit boundary stating that existing TypeScript and Rust program paths remain unchanged while the new CLI is developed.
 **Plans**: TBD
 
-### Phase 4: Verification Baseline for Hardening
-**Goal**: Default verification catches hardening-critical regressions across config, rewrite parity, OAuth, and desktop lifecycle flows before release.
-**Depends on**: Phases 1, 2, and 3
-**Requirements**: QLT-01, QLT-02, QLT-03
+### Phase 6: Standalone CLI Scaffold & Credential Discovery
+**Goal**: An isolated new CLI surface exists and can detect supported local Claude credential sources without confusing operators or mutating legacy codepaths.
+**Depends on**: Phase 5
+**Requirements**: ENV-01, ISO-02
 **Success Criteria** (what must be TRUE):
-  1. Running the default repository verification commands exercises config parsing, production OAuth behavior, and desktop dashboard logic without extra tribal-knowledge steps.
-  2. Fixture-based parity tests catch regressions in prompt, env, header, and metadata normalization before operators ship changes.
-  3. Desktop lifecycle regressions such as TLS startup, post-start crash detection, and log polling are covered by automation or checked-in manual UAT guidance.
+  1. The new CLI lives in its own path or package with its own entrypoint and operator-facing docs.
+  2. The CLI checks the supported local Claude credential sources in a deterministic order and reports actionable failures when nothing usable is found.
+  3. Operators can tell from the code and docs that the new CLI is additive and does not replace the existing TypeScript gateway or Rust products.
 **Plans**: TBD
-**UI hint**: yes
+
+### Phase 7: Local Environment Construction & Runtime Preparation
+**Goal**: The new CLI can build or reuse the local bootstrap artifacts and runtime state needed for a gateway-backed Claude Code session.
+**Depends on**: Phase 6
+**Requirements**: ENV-02, ENV-03, ENV-04, ENV-05
+**Success Criteria** (what must be TRUE):
+  1. A first run can generate or reuse canonical identity, token, and local config or workspace artifacts without editing the existing TS or Rust applications.
+  2. A repeat run safely reuses or refreshes bootstrap artifacts instead of duplicating or corrupting them.
+  3. Proxy-aware settings from the local environment are preserved when the bootstrap flow prepares outbound access.
+  4. The runtime state required for the generated environment is prepared before Claude launch begins.
+**Plans**: TBD
+
+### Phase 8: Claude Launch Handoff
+**Goal**: The new CLI launches the locally installed `claude` executable through the prepared environment with transparent argument passthrough and clear failure handling.
+**Depends on**: Phase 7
+**Requirements**: RUN-01, RUN-02, RUN-03, RUN-04
+**Success Criteria** (what must be TRUE):
+  1. The CLI locates the locally installed `claude` executable and launches it automatically after bootstrap succeeds.
+  2. The launched process receives the required gateway-oriented environment variables without manual operator setup.
+  3. Arbitrary Claude CLI arguments pass through the new CLI unchanged.
+  4. Missing-`claude` or launch-execution failures stop the flow with actionable install or PATH guidance.
+**Plans**: TBD
+
+### Phase 9: Validation & Operator Guidance
+**Goal**: The new CLI is backed by automated checks and operator docs that prove first-run, repeat-run, and failure-recovery behavior.
+**Depends on**: Phases 7 and 8
+**Requirements**: QLT-01, QLT-02
+**Success Criteria** (what must be TRUE):
+  1. Automated tests cover capability inventory classification, credential detection decisions, bootstrap artifact generation, and launch environment preparation.
+  2. Checked-in operator guidance explains first-run bootstrap, repeat-run behavior, and recovery for missing credentials or missing `claude`.
+  3. The validation surface does not require live OAuth traffic to prove core CLI behavior.
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Desktop Control Plane Reliability | 0/TBD | Not started | - |
-| 2. Secret-Safe Operator Surfaces | 0/TBD | Not started | - |
-| 3. Rust Gateway Parity Guardrails | 0/TBD | Not started | - |
-| 4. Verification Baseline for Hardening | 0/TBD | Not started | - |
+| 5. TS Backend Capability Inventory | 0/TBD | Not started | - |
+| 6. Standalone CLI Scaffold & Credential Discovery | 0/TBD | Not started | - |
+| 7. Local Environment Construction & Runtime Preparation | 0/TBD | Not started | - |
+| 8. Claude Launch Handoff | 0/TBD | Not started | - |
+| 9. Validation & Operator Guidance | 0/TBD | Not started | - |
