@@ -55,25 +55,25 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GW-01 | TBD | Pending |
-| GW-02 | TBD | Pending |
-| GW-03 | TBD | Pending |
-| OPS-01 | TBD | Pending |
-| OPS-02 | TBD | Pending |
-| OPS-03 | TBD | Pending |
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| CFG-01 | TBD | Pending |
-| CFG-02 | TBD | Pending |
-| QLT-01 | TBD | Pending |
-| QLT-02 | TBD | Pending |
-| QLT-03 | TBD | Pending |
+| GW-01 | Phase 3 | Pending |
+| GW-02 | Phase 3 | Pending |
+| GW-03 | Phase 3 | Pending |
+| OPS-01 | Phase 1 | Pending |
+| OPS-02 | Phase 1 | Pending |
+| OPS-03 | Phase 1 | Pending |
+| SEC-01 | Phase 2 | Pending |
+| SEC-02 | Phase 2 | Pending |
+| SEC-03 | Phase 2 | Pending |
+| CFG-01 | Phase 1 | Pending |
+| CFG-02 | Phase 1 | Pending |
+| QLT-01 | Phase 4 | Pending |
+| QLT-02 | Phase 4 | Pending |
+| QLT-03 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 ⚠️
+- Mapped to phases: 14
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-08*
