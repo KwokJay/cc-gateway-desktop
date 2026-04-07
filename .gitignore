@@ -5,3 +5,11 @@ dist/
 config.yaml
 certs/
 clients/
+.omx/
+.planning/
+.docs/
+.sisyphus/
+.cargo/
+.claude/
+.cursor/
+target/
