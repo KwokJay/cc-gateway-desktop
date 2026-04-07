@@ -17,6 +17,8 @@ echo ""
 
 # 1. Generate identity + client token
 DEVICE_ID=$(openssl rand -hex 32)
+ACCOUNT_UUID="canonical-account-$(openssl rand -hex 8)"
+SESSION_ID="canonical-session-$(openssl rand -hex 8)"
 CLIENT_TOKEN=$(openssl rand -hex 32)
 CLIENT_NAME="${1:-whiletrue0x}"
 
@@ -68,6 +70,8 @@ auth:
 identity:
   device_id: "${DEVICE_ID}"
   email: "user@example.com"
+  account_uuid: "${ACCOUNT_UUID}"
+  session_id: "${SESSION_ID}"
 
 env:
   platform: darwin

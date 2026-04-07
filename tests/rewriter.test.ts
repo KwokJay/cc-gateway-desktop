@@ -10,6 +10,8 @@ const config: Config = {
   identity: {
     device_id: 'canonical_device_id_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     email: 'canonical@example.com',
+    account_uuid: 'canonical_account_uuid_aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnoooopppp',
+    session_id: 'canonical_session_id_1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff',
   },
   env: {
     platform: 'darwin',
@@ -62,7 +64,7 @@ function test(name: string, fn: () => void) {
 console.log('\n/v1/messages - metadata.user_id rewriting')
 // ============================================================
 
-test('rewrites device_id in metadata.user_id', () => {
+test('rewrites device_id, account_uuid, session_id in metadata.user_id', () => {
   const body = {
     metadata: {
       user_id: JSON.stringify({
@@ -80,8 +82,8 @@ test('rewrites device_id in metadata.user_id', () => {
   const userId = JSON.parse(result.metadata.user_id)
 
   assert.equal(userId.device_id, config.identity.device_id)
-  assert.equal(userId.account_uuid, 'acct-123', 'account_uuid should be preserved')
-  assert.equal(userId.session_id, 'sess-456', 'session_id should be preserved')
+  assert.equal(userId.account_uuid, config.identity.account_uuid, 'account_uuid should be canonicalized')
+  assert.equal(userId.session_id, config.identity.session_id, 'session_id should be canonicalized')
 })
 
 // ============================================================
@@ -159,13 +161,15 @@ test('rewrites home paths in user messages with system-reminder', () => {
 console.log('\n/api/event_logging/batch - event data rewriting')
 // ============================================================
 
-test('rewrites device_id and email in events', () => {
+test('rewrites device_id, email, account_uuid, session_id in events', () => {
   const body = {
     events: [{
       event_type: 'ClaudeCodeInternalEvent',
       event_data: {
         device_id: 'real_device_id',
         email: 'real@email.com',
+        account_uuid: 'acct-789',
+        session_id: 'sess-abc',
         event_name: 'tengu_init',
         env: { platform: 'linux', arch: 'x64' },
       },
@@ -177,9 +181,11 @@ test('rewrites device_id and email in events', () => {
   const data = result.events[0].event_data
   assert.equal(data.device_id, config.identity.device_id)
   assert.equal(data.email, config.identity.email)
+  assert.equal(data.account_uuid, config.identity.account_uuid, 'account_uuid should be canonicalized')
+  assert.equal(data.session_id, config.identity.session_id, 'session_id should be canonicalized')
 })
 
-test('replaces entire env object with canonical', () => {
+test('replaces entire env object with canonical (legacy inline config)', () => {
   const body = {
     events: [{
       event_type: 'ClaudeCodeInternalEvent',
@@ -208,6 +214,97 @@ test('replaces entire env object with canonical', () => {
   assert.equal(env.deployment_environment, 'unknown-darwin')
 })
 
+test('replaces env with 40+ keys when canonical profile is loaded', () => {
+  const canonicalConfig: Config = {
+    ...config,
+    _canonical_profile: {
+      version: '1.0',
+      identity: config.identity,
+      env: {
+        platform: 'darwin',
+        platform_raw: 'darwin',
+        arch: 'arm64',
+        node_version: 'v24.3.0',
+        terminal: 'iTerm2.app',
+        package_managers: 'npm,pnpm',
+        runtimes: 'node',
+        is_running_with_bun: false,
+        is_ci: false,
+        is_claubbit: false,
+        is_claude_code_remote: false,
+        is_local_agent_mode: false,
+        is_conductor: false,
+        is_github_action: false,
+        is_claude_code_action: false,
+        is_claude_ai_auth: true,
+        version: '2.1.81',
+        version_base: '2.1.81',
+        build_time: '2026-03-20T21:26:18Z',
+        deployment_environment: 'unknown-darwin',
+        vcs: 'git',
+        shell: 'zsh',
+        shell_version: 'zsh 5.9',
+        locale: 'en_US.UTF-8',
+        timezone: 'America/Los_Angeles',
+        editor: 'code',
+        cpu_cores: 10,
+        total_memory: 34359738368,
+        hostname: 'Jacks-MacBook-Pro.local',
+        username: 'jack',
+        home_dir: '/Users/jack',
+        os_release: '14.4.0',
+        kernel_version: 'Darwin Kernel Version 24.4.0',
+        docker_available: true,
+        git_version: '2.45.2',
+        python_version: '3.12.3',
+        screen_resolution: '3024x1964',
+        color_depth: 24,
+        network_interfaces: 'en0,lo0',
+        ipv4_address: '192.168.1.100',
+        ipv6_address: 'fe80::1',
+        mac_address: 'a4:83:e7:12:34:56',
+        uptime: 864000,
+        boot_time: '2026-03-25T09:15:00Z',
+      },
+      prompt_env: config.prompt_env,
+      process: config.process,
+    },
+  }
+
+  const body = {
+    events: [{
+      event_type: 'ClaudeCodeInternalEvent',
+      event_data: {
+        device_id: 'x',
+        env: { platform: 'linux', arch: 'x64' },
+      },
+    }],
+  }
+  const result = JSON.parse(
+    rewriteBody(Buffer.from(JSON.stringify(body)), '/api/event_logging/batch', canonicalConfig).toString(),
+  )
+  const env = result.events[0].event_data.env
+
+  const keys = Object.keys(env)
+  assert.ok(keys.length >= 40, `Expected 40+ keys, got ${keys.length}`)
+  
+  assert.equal(env.platform, 'darwin')
+  assert.equal(env.shell, 'zsh')
+  assert.equal(env.shell_version, 'zsh 5.9')
+  assert.equal(env.locale, 'en_US.UTF-8')
+  assert.equal(env.timezone, 'America/Los_Angeles')
+  assert.equal(env.editor, 'code')
+  assert.equal(env.cpu_cores, 10)
+  assert.equal(env.total_memory, 34359738368)
+  assert.equal(env.hostname, 'Jacks-MacBook-Pro.local')
+  assert.equal(env.username, 'jack')
+  assert.equal(env.home_dir, '/Users/jack')
+  assert.equal(env.git_version, '2.45.2')
+  assert.equal(env.python_version, '3.12.3')
+  assert.equal(env.screen_resolution, '3024x1964')
+  assert.equal(env.mac_address, 'a4:83:e7:12:34:56')
+})
+
 test('strips baseUrl that leaks gateway address', () => {
   const body = {
     events: [{
@@ -225,6 +322,47 @@ test('strips baseUrl that leaks gateway address', () => {
   const data = result.events[0].event_data
   assert.equal(data.baseUrl, undefined, 'baseUrl should be stripped')
   assert.equal(data.gateway, undefined, 'gateway should be stripped')
+})
+
+test('recursively sanitizes identity fields in additional_metadata', () => {
+  const metadata = {
+    baseUrl: 'https://gateway.com',
+    user: {
+      device_id: 'old_device',
+      email: 'old@email.com',
+      account_uuid: 'old-acct',
+      session_id: 'old-sess',
+    },
+    nested: {
+      deeper: {
+        device_id: 'nested_device',
+        account_uuid: 'nested-acct',
+      },
+    },
+  }
+  const body = {
+    events: [{
+      event_type: 'ClaudeCodeInternalEvent',
+      event_data: {
+        device_id: 'x',
+        additional_metadata: Buffer.from(JSON.stringify(metadata)).toString('base64'),
+      },
+    }],
+  }
+  const result = JSON.parse(
+    rewriteBody(Buffer.from(JSON.stringify(body)), '/api/event_logging/batch', config).toString(),
+  )
+  const decoded = JSON.parse(
+    Buffer.from(result.events[0].event_data.additional_metadata, 'base64').toString(),
+  )
+  
+  assert.equal(decoded.baseUrl, undefined, 'baseUrl should be stripped')
+  assert.equal(decoded.user.device_id, config.identity.device_id)
+  assert.equal(decoded.user.email, config.identity.email)
+  assert.equal(decoded.user.account_uuid, config.identity.account_uuid)
+  assert.equal(decoded.user.session_id, config.identity.session_id)
+  assert.equal(decoded.nested.deeper.device_id, config.identity.device_id)
+  assert.equal(decoded.nested.deeper.account_uuid, config.identity.account_uuid)
 })
 
 test('rewrites process metrics (base64 encoded)', () => {
@@ -310,6 +448,24 @@ test('passes non-JSON body through unchanged', () => {
   const raw = Buffer.from('not json content')
   const result = rewriteBody(raw, '/v1/messages', config)
   assert.equal(result.toString(), 'not json content')
+})
+
+test('rewrites identity in policy_limits generic payloads', () => {
+  const body = {
+    device_id: 'old_device',
+    email: 'old@email.com',
+    account_uuid: 'old-acct',
+    session_id: 'old-sess',
+    other_field: 'preserved',
+  }
+  const result = JSON.parse(
+    rewriteBody(Buffer.from(JSON.stringify(body)), '/policy_limits', config).toString(),
+  )
+  assert.equal(result.device_id, config.identity.device_id)
+  assert.equal(result.email, config.identity.email)
+  assert.equal(result.account_uuid, config.identity.account_uuid)
+  assert.equal(result.session_id, config.identity.session_id)
+  assert.equal(result.other_field, 'preserved')
 })
 
 // ============================================================

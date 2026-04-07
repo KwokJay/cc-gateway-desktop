@@ -31,11 +31,19 @@ auth:
     - name: machine-b
       token: change-me-token-2
 
+# CANONICAL PROFILE (OPTIONAL)
+# For aggressive-mode parity: point to an external JSON profile with 40+ env dimensions.
+# When set, this overrides the inline identity/env/prompt_env/process sections below.
+# See config/canonical-profile.example.json and config/canonical-profile.schema.json
+# canonical_profile_path: config/canonical-profile.example.json
+
 # Canonical identity - all clients will appear as this single device
 # Generate a fresh identity: npm run generate-identity
 identity:
-  device_id: "0000000000000000000000000000000000000000000000000000000000000000"
+  device_id: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
   email: "user@example.com"
+  account_uuid: "canonical-account-uuid"
+  session_id: "canonical-session-id"
 
 # Canonical environment fingerprint
 # Should match a real machine's profile to look natural

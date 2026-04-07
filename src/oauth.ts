@@ -23,7 +23,7 @@ let cachedTokens: OAuthTokens | null = null
 /**
  * Initialize OAuth.
  * If a valid access_token is provided, use it immediately — no network call.
- * Only refresh when the token is expired or about to expire.
+ * Only refresh when the token is actually expired.
  */
 export async function initOAuth(oauth: {
   access_token?: string
@@ -32,10 +32,9 @@ export async function initOAuth(oauth: {
 }): Promise<void> {
   const now = Date.now()
   const expiresAt = oauth.expires_at ?? 0
-  const fiveMinutes = 5 * 60 * 1000
 
-  // Use existing access token if still valid (with 5-min buffer)
-  if (oauth.access_token && expiresAt > now + fiveMinutes) {
+  // Use existing access token if still valid at actual expiry
+  if (oauth.access_token && expiresAt > now) {
     cachedTokens = {
       accessToken: oauth.access_token,
       refreshToken: oauth.refresh_token,
@@ -63,11 +62,11 @@ function scheduleRefresh(refreshToken: string) {
   if (!cachedTokens) return
 
   const msUntilExpiry = cachedTokens.expiresAt - Date.now()
-  const refreshIn = Math.max(msUntilExpiry - 5 * 60 * 1000, 10_000)
+  const refreshIn = Math.max(msUntilExpiry, 1_000)
 
   setTimeout(async () => {
     try {
-      log('info', 'Auto-refreshing OAuth token...')
+      log('info', 'Auto-refreshing OAuth token at expiry...')
       cachedTokens = await refreshOAuthToken(
         cachedTokens?.refreshToken || refreshToken,
       )
@@ -86,6 +85,36 @@ export function getAccessToken(): string | null {
     log('warn', 'OAuth token expired, waiting for refresh...')
     return null
   }
+  return cachedTokens.accessToken
+}
+
+export async function getAccessTokenOrRefresh(refreshToken: string): Promise<string | null> {
+  if (!cachedTokens) {
+    log('warn', 'No cached tokens, attempting refresh...')
+    try {
+      cachedTokens = await refreshOAuthToken(refreshToken)
+      log('info', `OAuth token refreshed, expires at ${new Date(cachedTokens.expiresAt).toISOString()}`)
+      scheduleRefresh(refreshToken)
+      return cachedTokens.accessToken
+    } catch (err) {
+      log('error', `OAuth refresh failed: ${err}`)
+      return null
+    }
+  }
+
+  if (Date.now() >= cachedTokens.expiresAt) {
+    log('info', 'Token expired, refreshing lazily...')
+    try {
+      cachedTokens = await refreshOAuthToken(cachedTokens.refreshToken || refreshToken)
+      log('info', `OAuth token refreshed, expires at ${new Date(cachedTokens.expiresAt).toISOString()}`)
+      scheduleRefresh(cachedTokens.refreshToken || refreshToken)
+      return cachedTokens.accessToken
+    } catch (err) {
+      log('error', `OAuth refresh failed: ${err}`)
+      return null
+    }
+  }
+
   return cachedTokens.accessToken
 }
 

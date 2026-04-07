@@ -5,7 +5,7 @@ import { request as httpsRequest } from 'https'
 import { URL } from 'url'
 import type { Config } from './config.js'
 import { authenticate, initAuth } from './auth.js'
-import { getAccessToken } from './oauth.js'
+import { getAccessToken, getAccessTokenOrRefresh } from './oauth.js'
 import { rewriteBody, rewriteHeaders } from './rewriter.js'
 import { audit, log } from './logger.js'
 import { getProxyAgent } from './proxy-agent.js'
@@ -95,11 +95,10 @@ async function handleRequest(
 
   log('info', `Client "${clientName}" → ${method} ${path}`)
 
-  // Get the real OAuth token (managed by gateway)
-  const oauthToken = getAccessToken()
+  const oauthToken = await getAccessTokenOrRefresh(config.oauth.refresh_token)
   if (!oauthToken) {
     res.writeHead(503, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ error: 'OAuth token not available - gateway is refreshing' }))
+    res.end(JSON.stringify({ error: 'OAuth token unavailable after refresh attempt' }))
     log('error', 'No valid OAuth token available')
     return
   }

@@ -98,6 +98,8 @@ GATEWAY_URL="${GATEWAY_SCHEME}://${GATEWAY_HOST}:${GATEWAY_PORT}"
 
 # ── 5. Generate identity + admin token ──
 DEVICE_ID=$(openssl rand -hex 32)
+ACCOUNT_UUID="canonical-account-$(openssl rand -hex 8)"
+SESSION_ID="canonical-session-$(openssl rand -hex 8)"
 ADMIN_TOKEN=$(openssl rand -hex 32)
 ADMIN_NAME=$(hostname -s)
 echo "✓ Device ID: ${DEVICE_ID:0:8}..."
@@ -123,6 +125,8 @@ auth:
 identity:
   device_id: "${DEVICE_ID}"
   email: "user@example.com"
+  account_uuid: "${ACCOUNT_UUID}"
+  session_id: "${SESSION_ID}"
 
 env:
   platform: darwin

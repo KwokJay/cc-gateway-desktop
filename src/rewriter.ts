@@ -33,6 +33,23 @@ function extractFirstUserMessage(messages: any[]): string {
   return ''
 }
 
+function rewriteIdentityFields(obj: any, config: Config): void {
+  if (typeof obj !== 'object' || obj === null) return
+  
+  if (obj.device_id !== undefined) {
+    obj.device_id = config.identity.device_id
+  }
+  if (obj.email !== undefined) {
+    obj.email = config.identity.email
+  }
+  if (obj.account_uuid !== undefined) {
+    obj.account_uuid = config.identity.account_uuid
+  }
+  if (obj.session_id !== undefined) {
+    obj.session_id = config.identity.session_id
+  }
+}
+
 /**
  * Rewrite identity fields in the API request body.
  *
@@ -72,13 +89,13 @@ export function rewriteBody(body: Buffer, path: string, config: Config): Buffer 
  * 4. Rewrite system prompt billing header using computed hash
  */
 function rewriteMessagesBody(body: any, config: Config) {
-  // Rewrite metadata.user_id
+  // Rewrite metadata.user_id - aggressive mode: device_id, account_uuid, session_id
   if (body?.metadata?.user_id) {
     try {
       const userId = JSON.parse(body.metadata.user_id)
-      userId.device_id = config.identity.device_id
+      rewriteIdentityFields(userId, config)
       body.metadata.user_id = JSON.stringify(userId)
-      log('debug', `Rewrote metadata.user_id device_id`)
+      log('debug', `Rewrote metadata.user_id identity fields`)
     } catch {
       log('warn', `Failed to parse metadata.user_id`)
     }
@@ -215,9 +232,8 @@ function rewriteEventBatch(body: any, config: Config) {
     if (!event?.event_data) continue
     const data = event.event_data
 
-    // Identity fields
-    if (data.device_id) data.device_id = config.identity.device_id
-    if (data.email) data.email = config.identity.email
+    // Identity fields - aggressive mode: device_id, email, account_uuid, session_id
+    rewriteIdentityFields(data, config)
 
     // Environment fingerprint - replace entirely with canonical
     if (data.env) {
@@ -245,34 +261,25 @@ function rewriteEventBatch(body: any, config: Config) {
 
 function rewriteGenericIdentity(body: any, config: Config) {
   if (typeof body !== 'object' || body === null) return
-  if (body.device_id) body.device_id = config.identity.device_id
-  if (body.email) body.email = config.identity.email
+  rewriteIdentityFields(body, config)
+}
+
+/**
+ * Get the canonical environment map to use for event rewriting.
+ * Prefers the loaded canonical profile if available; otherwise uses inline config.env.
+ */
+function getCanonicalEnv(config: Config): Record<string, unknown> {
+  if (config._canonical_profile?.env) {
+    // When a canonical profile is loaded, use its full env map (40+ keys)
+    return config._canonical_profile.env
+  }
+  // Legacy fallback: inline config.env from config.yaml
+  return config.env
 }
 
 function buildCanonicalEnv(config: Config): Record<string, unknown> {
-  return {
-    platform: config.env.platform,
-    platform_raw: config.env.platform_raw || config.env.platform,
-    arch: config.env.arch,
-    node_version: config.env.node_version,
-    terminal: config.env.terminal,
-    package_managers: config.env.package_managers,
-    runtimes: config.env.runtimes,
-    is_running_with_bun: config.env.is_running_with_bun ?? false,
-    is_ci: false,
-    is_claubbit: false,
-    is_claude_code_remote: false,
-    is_local_agent_mode: false,
-    is_conductor: false,
-    is_github_action: false,
-    is_claude_code_action: false,
-    is_claude_ai_auth: config.env.is_claude_ai_auth ?? true,
-    version: config.env.version,
-    version_base: config.env.version_base || config.env.version,
-    build_time: config.env.build_time,
-    deployment_environment: config.env.deployment_environment,
-    vcs: config.env.vcs,
-  }
+  // Return the entire canonical env map, not a fixed subset
+  return getCanonicalEnv(config)
 }
 
 function buildCanonicalProcess(original: any, config: Config): any {
@@ -305,12 +312,35 @@ function rewriteProcessFields(proc: any, config: Config): any {
 function rewriteAdditionalMetadata(original: string, config: Config): string {
   try {
     const decoded = JSON.parse(Buffer.from(original, 'base64').toString('utf-8'))
+    
+    // Strip gateway leak fields
     delete decoded.baseUrl
     delete decoded.base_url
     delete decoded.gateway
+    
+    // Recursively sanitize identity fields in nested structures
+    recursiveSanitizeIdentity(decoded, config)
+    
     return Buffer.from(JSON.stringify(decoded)).toString('base64')
   } catch {
     return original
+  }
+}
+
+/**
+ * Recursively sanitize identity fields in nested objects and arrays.
+ */
+function recursiveSanitizeIdentity(obj: any, config: Config): void {
+  if (typeof obj !== 'object' || obj === null) return
+  
+  // Rewrite identity fields at this level
+  rewriteIdentityFields(obj, config)
+  
+  // Recurse into nested structures
+  for (const value of Object.values(obj)) {
+    if (typeof value === 'object' && value !== null) {
+      recursiveSanitizeIdentity(value, config)
+    }
   }
 }
 
