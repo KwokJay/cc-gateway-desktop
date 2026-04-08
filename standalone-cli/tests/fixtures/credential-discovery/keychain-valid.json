@@ -1,0 +1,8 @@
+{
+  "claudeAiOauth": {
+    "accessToken": "sk-ant-keychain-access-1234567890",
+    "refreshToken": "rt-ant-keychain-refresh-1234567890",
+    "expiresAt": 1760000000000,
+    "emailAddress": "keychain-user@example.com"
+  }
+}

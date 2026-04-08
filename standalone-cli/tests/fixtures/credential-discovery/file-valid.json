@@ -1,0 +1,8 @@
+{
+  "email": "file-user@example.com",
+  "claudeAiOauth": {
+    "accessToken": "sk-ant-file-access-0987654321",
+    "refreshToken": "rt-ant-file-refresh-0987654321",
+    "expiresAt": 1770000000000
+  }
+}
