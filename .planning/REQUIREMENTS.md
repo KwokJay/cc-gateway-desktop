@@ -30,7 +30,7 @@
 - [x] **ISO-01**: Existing TypeScript gateway files, setup scripts, Rust daemon, Rust CLI, and desktop app remain behaviorally and structurally unchanged by the new CLI milestone.
 - [x] **ISO-02**: The new CLI lives in an isolated path or package with its own entrypoint and documentation, so operators can adopt it without affecting current TS or Rust flows.
 - [x] **QLT-01**: Automated tests cover capability inventory classification, credential detection decisions, bootstrap artifact generation, and Claude launch environment preparation without requiring live OAuth traffic.
-- [ ] **QLT-02**: Checked-in operator guidance covers first-run bootstrap, repeat-run behavior, and recovery paths for missing credentials or missing `claude`.
+- [x] **QLT-02**: Checked-in operator guidance covers first-run bootstrap, repeat-run behavior, and recovery paths for missing credentials or missing `claude`.
 
 ## v2 Requirements
 
@@ -67,7 +67,7 @@
 | RUN-03 | Phase 8 | Complete |
 | RUN-04 | Phase 8 | Complete |
 | QLT-01 | Phase 9 | Complete |
-| QLT-02 | Phase 9 | Pending |
+| QLT-02 | Phase 9 | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total

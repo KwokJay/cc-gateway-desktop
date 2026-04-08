@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 09-validation-operator-guidance-01-PLAN.md
-last_updated: "2026-04-08T09:44:27.108Z"
+status: verifying
+stopped_at: Completed 09-validation-operator-guidance-02-PLAN.md
+last_updated: "2026-04-08T09:50:28.651Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 
 Phase: 09 (Validation & Operator Guidance) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-08
 
 Progress: [████████░░] 80%
@@ -55,6 +55,7 @@ Progress: [████████░░] 80%
 - Trend: Stable
 
 | Phase 09-validation-operator-guidance P01 | 9min | 2 tasks | 3 files |
+| Phase 09-validation-operator-guidance P02 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 08-claude-launch-handoff]: Derive the client token from the CLI-owned manifest and ANTHROPIC_BASE_URL from prepared runtime health state instead of introducing a second handoff state store.
 - [Phase 08-claude-launch-handoff]: Use direct child-process spawn with shell disabled for Claude handoff so argv passthrough stays exact and shell injection risk stays out of scope.
 - [Phase 09-validation-operator-guidance]: Treat 05-CAPABILITY-INVENTORY.md as executable contract data and fail validation when Phase 9-critical rows or Known Drift disappear.
+- [Phase 09-validation-operator-guidance]: Make standalone-cli/README.md the single authoritative operator guide and keep docs/standalone-cli.md as a short overview.
+- [Phase 09-validation-operator-guidance]: Enforce first run, rerun, and recovery guidance with a package-local string contract instead of relying on manual doc review.
 
 ### Pending Todos
 
@@ -98,6 +101,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T09:44:27.104Z
-Stopped at: Completed 09-validation-operator-guidance-01-PLAN.md
+Last session: 2026-04-08T09:50:28.649Z
+Stopped at: Completed 09-validation-operator-guidance-02-PLAN.md
 Resume file: None
