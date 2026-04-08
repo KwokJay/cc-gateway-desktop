@@ -12,6 +12,7 @@
     "test:environment": "tsx tests/environment-bootstrap.test.ts",
     "test:proxy-env": "tsx tests/proxy-env.test.ts",
     "test:runtime": "tsx tests/runtime-preparation.test.ts",
+    "test:launch": "tsx tests/claude-launch.test.ts",
     "test:help": "tsx tests/cli-help.test.ts",
     "test:credentials": "tsx tests/credential-discovery.test.ts"
   }

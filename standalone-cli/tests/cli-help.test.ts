@@ -60,7 +60,7 @@ function assertHelpContract(helpText: string): void {
 const renderedHelp = renderHelpText()
 assertHelpContract(renderedHelp)
 
-for (const argv of [[], ['help'], ['-h'], ['--help']]) {
+for (const argv of [['help'], ['-h'], ['--help']]) {
   const result = await captureRun(argv)
   assert.equal(result.exitCode, 0)
   assert.equal(result.stderr, '')

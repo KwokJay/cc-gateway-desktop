@@ -50,17 +50,17 @@ export function renderHelpText(): string {
   return `CC Gateway Standalone CLI
 
 Usage:
-  ccgw-standalone-cli
+  ccgw-standalone-cli [claude args]
   ccgw-standalone-cli help
   ccgw-standalone-cli -h
   ccgw-standalone-cli --help
   ccgw-standalone-cli discover-credentials
   ccgw-standalone-cli prepare-runtime
 
-Phase 7 scope:
-  - additive standalone scaffold with credential discovery and proxy-aware runtime preparation
+Phase 8 scope:
+  - claude launch handoff after credential discovery and proxy-aware runtime preparation
   - does not replace src/, scripts/, crates/core/, crates/daemon/, crates/cli/, or crates/desktop/
-  - excludes claude launch behavior and arbitrary passthrough arguments until Phase 8
+  - launch the locally installed claude executable after runtime preparation succeeds
 
 Commands:
   discover-credentials  Check macOS Keychain first on darwin, then the credentials file fallback
@@ -68,11 +68,16 @@ Commands:
 
 Package-local verification:
   - npm --prefix standalone-cli run build
+  - npm --prefix standalone-cli run test:launch
   - npx tsx standalone-cli/tests/cli-help.test.ts
   - npx tsx standalone-cli/tests/credential-discovery.test.ts
   - npx tsx standalone-cli/tests/environment-bootstrap.test.ts
   - npx tsx standalone-cli/tests/proxy-env.test.ts
   - npx tsx standalone-cli/tests/runtime-preparation.test.ts
+  - npx tsx standalone-cli/tests/claude-launch.test.ts
+
+package-local launch verification:
+  - bare invocation and ccgw-standalone-cli [claude args] prepare the runtime first, then exec claude with unchanged argv
 `
 }
 
@@ -93,5 +98,16 @@ Detail: ${detail}
 Next step:
   Check local proxy env, credentials, and gateway build output
   Retry ccgw-standalone-cli prepare-runtime
+`
+}
+
+export function renderClaudeLaunchFailure(detail: string): string {
+  return `claude launch: failed
+
+Detail: ${detail}
+Next step:
+  Install Claude Code if needed: npm install -g @anthropic-ai/claude-code
+  Open a new shell and confirm claude --help works from PATH
+  Retry ccgw-standalone-cli [claude args]
 `
 }

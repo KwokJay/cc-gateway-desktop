@@ -1,6 +1,10 @@
 import { discoverCredentials } from './credential-discovery/discover.js'
+import { readBootstrapManifest } from './environment/manifest.js'
 import { prepareRuntimeEnvironment } from './environment/prepare.js'
+import type { PreparedRuntimeSummary } from './environment/types.js'
+import { launchClaude } from './launch/claude.js'
 import {
+  renderClaudeLaunchFailure,
   renderDiscoveryFailure,
   renderDiscoverySuccess,
   renderHelpText,
@@ -15,16 +19,31 @@ const PREPARE_RUNTIME_COMMAND = 'prepare-runtime'
 export interface CliDependencies {
   discoverCredentials?: typeof discoverCredentials
   prepareRuntimeEnvironment?: typeof prepareRuntimeEnvironment
-  launchClaude?: (...args: unknown[]) => Promise<number> | number
+  readBootstrapManifest?: typeof readBootstrapManifest
+  launchClaude?: typeof launchClaude
 }
 
 export function shouldRenderHelp(argv: string[]): boolean {
-  return argv.length === 0 || HELP_COMMANDS.has(argv[0] ?? '')
+  return HELP_COMMANDS.has(argv[0] ?? '')
+}
+
+function deriveGatewayUrl(summary: PreparedRuntimeSummary): string {
+  try {
+    return new URL(summary.runtime.healthUrl).origin
+  } catch {
+    if (summary.runtime.port !== undefined) {
+      return `http://127.0.0.1:${summary.runtime.port}`
+    }
+
+    throw new Error(`Prepared runtime health URL is invalid: ${summary.runtime.healthUrl}`)
+  }
 }
 
 export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<number> {
   const discover = dependencies.discoverCredentials ?? discoverCredentials
   const prepareRuntime = dependencies.prepareRuntimeEnvironment ?? prepareRuntimeEnvironment
+  const readManifest = dependencies.readBootstrapManifest ?? readBootstrapManifest
+  const handoffToClaude = dependencies.launchClaude ?? launchClaude
 
   if (shouldRenderHelp(argv)) {
     process.stdout.write(renderHelpText())
@@ -69,11 +88,31 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
   }
 
-  if (!shouldRenderHelp(argv)) {
-    process.stderr.write(`Unknown command: ${argv[0]}\n`)
-    process.stderr.write(renderHelpText())
+  const result = await discover()
+
+  if (!result.ok) {
+    process.stderr.write(renderDiscoveryFailure(result))
     return 1
   }
 
-  return 1
+  try {
+    const summary = await prepareRuntime(result.credentials)
+    const manifest = await readManifest(summary.bootstrap.workspacePaths)
+
+    if (!manifest) {
+      throw new Error(`Bootstrap manifest missing at ${summary.bootstrap.workspacePaths.manifestPath}`)
+    }
+
+    return await handoffToClaude({
+      args: [...argv],
+      clientToken: manifest.client.token,
+      cwd: process.cwd(),
+      env: process.env,
+      gatewayUrl: deriveGatewayUrl(summary),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    process.stderr.write(renderClaudeLaunchFailure(message))
+    return 1
+  }
 }
