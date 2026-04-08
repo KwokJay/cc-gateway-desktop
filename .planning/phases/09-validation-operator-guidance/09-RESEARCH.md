@@ -249,17 +249,15 @@ Source: `standalone-cli/tests/environment-bootstrap.test.ts`. [VERIFIED: repo fi
 
 All claims in this research were verified from repo files, prompt context, or local command output during this session. [VERIFIED: repo files] [VERIFIED: user prompt] [VERIFIED: local commands]
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the aggregate review command be exposed as `npm test` or `npm run test:all` inside `standalone-cli/`?**
    - What we know: `npm --prefix standalone-cli test` currently fails because the package has no `test` script, while all individual test scripts already exist. [VERIFIED: repo files] [VERIFIED: local commands]
-   - What's unclear: Whether the repo prefers the conventional `npm test` affordance or wants to preserve only named scripts. [VERIFIED: repo files]
-   - Recommendation: Prefer `npm test` backed by a named aggregate script if desired, because reviewers will try `npm test` first and the failure already shows up today. [VERIFIED: repo files] [VERIFIED: local commands]
+   - Resolution: expose the aggregate review command as `npm test`, optionally backed by a `test:all` alias internally, because reviewers will reach for the conventional `npm test` affordance first. [VERIFIED: repo files] [VERIFIED: local commands]
 
 2. **Should `docs/standalone-cli.md` remain as a summary or become a pure pointer?**
    - What we know: The current detailed repo-level doc is stale, while the package README already matches the live command surface better. [VERIFIED: repo files]
-   - What's unclear: Whether the repo wants a top-level docs index entry for discoverability outside the package directory. [VERIFIED: repo files]
-   - Recommendation: Keep a short repo-level summary or pointer for discoverability, but put all detailed procedure content in `standalone-cli/README.md`. [VERIFIED: repo files]
+   - Resolution: keep `docs/standalone-cli.md` as a short repo-level overview or pointer for discoverability, but move all detailed operator procedure content to `standalone-cli/README.md` and treat that README as canonical. [VERIFIED: repo files]
 
 ## Environment Availability
 
