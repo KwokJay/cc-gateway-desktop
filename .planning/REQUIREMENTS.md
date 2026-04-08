@@ -20,9 +20,9 @@
 
 ### Claude Launch
 
-- [ ] **RUN-01**: After environment bootstrap succeeds, the new CLI locates the locally installed `claude` executable and launches it automatically.
-- [ ] **RUN-02**: The launched Claude process receives `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, and `CLAUDE_CODE_ATTRIBUTION_HEADER=false` without requiring manual operator setup.
-- [ ] **RUN-03**: Arbitrary Claude command-line arguments pass through the new CLI unchanged.
+- [x] **RUN-01**: After environment bootstrap succeeds, the new CLI locates the locally installed `claude` executable and launches it automatically.
+- [x] **RUN-02**: The launched Claude process receives `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, and `CLAUDE_CODE_ATTRIBUTION_HEADER=false` without requiring manual operator setup.
+- [x] **RUN-03**: Arbitrary Claude command-line arguments pass through the new CLI unchanged.
 - [x] **RUN-04**: If Claude Code is not installed or cannot be executed, the new CLI exits with actionable installation or PATH guidance instead of reporting partial success.
 
 ### Isolation & Verification
@@ -62,9 +62,9 @@
 | ENV-03 | Phase 7 | Complete |
 | ENV-04 | Phase 7 | Complete |
 | ENV-05 | Phase 7 | Complete |
-| RUN-01 | Phase 8 | Pending |
-| RUN-02 | Phase 8 | Pending |
-| RUN-03 | Phase 8 | Pending |
+| RUN-01 | Phase 8 | Complete |
+| RUN-02 | Phase 8 | Complete |
+| RUN-03 | Phase 8 | Complete |
 | RUN-04 | Phase 8 | Complete |
 | QLT-01 | Phase 9 | Pending |
 | QLT-02 | Phase 9 | Pending |

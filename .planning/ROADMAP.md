@@ -74,7 +74,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 08-01-PLAN.md — Harden the Phase 7 runtime-prep substrate for stable repo-root, timeout, PID-ownership, and symlink-safe launch prerequisites.
-- [ ] 08-02-PLAN.md — Add direct Claude handoff with exact env injection, unchanged arg passthrough, and actionable missing-command guidance.
+- [x] 08-02-PLAN.md — Add direct Claude handoff with exact env injection, unchanged arg passthrough, and actionable missing-command guidance.
 
 ### Phase 9: Validation & Operator Guidance
 **Goal**: The new CLI is backed by automated checks and operator docs that prove first-run, repeat-run, and failure-recovery behavior.

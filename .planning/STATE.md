@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-04-08T07:50:12.220Z"
+status: verifying
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-04-08T08:03:39.811Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 
 Phase: 08 (Claude Launch Handoff) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-08
 
 Progress: [██████░░░░] 60%
@@ -54,6 +54,7 @@ Progress: [██████░░░░] 60%
 - Trend: Stable
 
 | Phase 08 P01 | 10min | 2 tasks | 7 files |
+| Phase 08-claude-launch-handoff P02 | 8min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [Phase 08]: Resolve the gateway repo root from the standalone package location instead of caller cwd so launch prep cannot be redirected by invocation context.
 - [Phase 08]: Persist runtime ownership in runtime.json and require it to match manifest state before stopping a stale PID.
 - [Phase 08]: Bound each health probe separately so one hung request cannot silently consume the entire readiness budget.
+- [Phase 08-claude-launch-handoff]: Keep bare invocation and non-command argv on the same discover→prepare→manifest→launch path so the standalone launch surface cannot drift.
+- [Phase 08-claude-launch-handoff]: Derive the client token from the CLI-owned manifest and ANTHROPIC_BASE_URL from prepared runtime health state instead of introducing a second handoff state store.
+- [Phase 08-claude-launch-handoff]: Use direct child-process spawn with shell disabled for Claude handoff so argv passthrough stays exact and shell injection risk stays out of scope.
 
 ### Pending Todos
 
@@ -93,6 +97,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T07:50:12.217Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-04-08T08:03:39.809Z
+Stopped at: Completed 08-02-PLAN.md
 Resume file: None
