@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Standalone CLI Scaffold & Credential Discovery** - Create an isolated CLI entrypoint and detect supported local Claude credential sources safely.
 - [x] **Phase 7: Local Environment Construction & Runtime Preparation** - Build or reuse bootstrap artifacts and prepare the runtime state required before launch.
 - [ ] **Phase 8: Claude Launch Handoff** - Launch the installed `claude` executable through the prepared environment with full argument passthrough and failure handling.
-- [ ] **Phase 9: Validation & Operator Guidance** - Add tests and operator documentation that make the new CLI repeatable and supportable.
+- [x] **Phase 9: Validation & Operator Guidance** - Add tests and operator documentation that make the new CLI repeatable and supportable.
 
 ## Phase Details
 
@@ -100,4 +100,4 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 | 6. Standalone CLI Scaffold & Credential Discovery | 2/2 | Complete | 2026-04-08 |
 | 7. Local Environment Construction & Runtime Preparation | 2/2 | Complete | 2026-04-08 |
 | 8. Claude Launch Handoff | 2/2 | Complete | 2026-04-08 |
-| 9. Validation & Operator Guidance | 0/TBD | Not started | - |
+| 9. Validation & Operator Guidance | 2/2 | Complete | 2026-04-08 |

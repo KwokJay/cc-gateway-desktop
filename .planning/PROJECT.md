@@ -25,12 +25,12 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 - ✓ Generate or reuse a standalone CLI-owned bootstrap workspace, manifest, and legacy-compatible config without repo-root side effects — validated in Phase 7 via `standalone-cli/src/environment/bootstrap.ts` and `.planning/phases/07-local-environment-construction-runtime-preparation/VERIFICATION.md`
 - ✓ Prepare a proxy-aware, health-gated local runtime before any Claude launch handoff — validated in Phase 7 via `standalone-cli/src/environment/proxy-env.ts`, `runtime.ts`, `prepare.ts`, and `.planning/phases/07-local-environment-construction-runtime-preparation/VERIFICATION.md`
 - ✓ Launch the locally installed `claude` executable through the prepared gateway environment with exact env injection, unchanged arg passthrough, and actionable missing-command guidance — validated in Phase 8 via `standalone-cli/src/launch/claude.ts` and `.planning/phases/08-claude-launch-handoff/VERIFICATION.md`
+- ✓ Expose one aggregate standalone validation command plus executable contract tests for both the Phase 05 inventory and canonical operator guidance — validated in Phase 9 via `standalone-cli/tests/run-all.ts`, `capability-inventory.test.ts`, `operator-guidance.test.ts`, and `.planning/phases/09-validation-operator-guidance/VERIFICATION.md`
 
 ### Active
 
 - Keep the existing TypeScript gateway, Rust daemon, Rust CLI, and desktop app unchanged while the new CLI is developed in an isolated path
-- Add verification and operator guidance for first-run bootstrap, repeat-run idempotency, and launch failure handling
-- Close the remaining validation and operator-guidance gaps for the standalone CLI before milestone completion
+- Monitor real-world operator use for launch/runtime edge cases before deciding whether to consolidate with legacy launcher surfaces in a future milestone
 
 ### Out of Scope
 
@@ -75,6 +75,7 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 | Use a CLI-owned workspace and manifest as the durable bootstrap source of truth               | Phase 7 validated idempotent reruns and legacy-compatible config rendering without recreating repo-root shell side effects                                     | ✓ Good     |
 | Gate runtime readiness on `/_health` instead of process spawn alone                           | Phase 7 validated that launch handoff should only happen after a proxy-aware healthy runtime is available                                                      | ✓ Good     |
 | Use direct child-process launch with exact env injection and no shell wrapper                 | Phase 8 validated safer argv passthrough and actionable missing-command handling while preserving the standalone package boundary                               | ✓ Good     |
+| Make the package README canonical and enforce docs/inventory drift with package-local tests   | Phase 9 closed the remaining proof and operator-guidance gaps without adding new runtime behavior                                                              | ✓ Good     |
 
 
 ## Current Milestone: v1.1 Standalone Claude Bootstrap CLI
@@ -109,4 +110,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-08 after Phase 8 completion*
+*Last updated: 2026-04-08 after Phase 9 completion*
