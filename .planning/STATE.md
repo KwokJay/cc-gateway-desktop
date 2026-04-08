@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 05-ts-backend-capability-inventory-01-PLAN.md
-last_updated: "2026-04-08T01:23:14.596Z"
+status: verifying
+stopped_at: Completed 05-ts-backend-capability-inventory-02-PLAN.md
+last_updated: "2026-04-08T01:28:24.057Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 50
+  completed_plans: 2
+  percent: 100
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 
 Phase: 05 (TS Backend Capability Inventory) — EXECUTING
 Plan: 2 of 2
-Status: Executing Phase 05
-Last activity: 2026-04-08 -- Completed Plan 05-01
+Status: Phase complete — ready for verification
+Last activity: 2026-04-08
 
 Progress: [█████░░░░░] 50%
 
@@ -51,6 +51,8 @@ Progress: [█████░░░░░] 50%
 - Last 5 plans: 05-01 (9 min)
 - Trend: Baseline forming
 
+| Phase 05-ts-backend-capability-inventory P02 | 2min | 2 tasks | 3 files |
+
 ## Accumulated Context
 
 ### Decisions
@@ -64,6 +66,7 @@ Recent decisions affecting current work:
 - Keep the TypeScript gateway as a reference surface until Rust parity and coverage are explicit.
 - [Phase 05-ts-backend-capability-inventory]: Use code, scripts, config, and tests as the authority when README narrative drifts.
 - [Phase 05-ts-backend-capability-inventory]: Classify each legacy TS capability by its concrete Phase 6 through Phase 9 consumer, not by proxy importance alone.
+- [Phase 05-ts-backend-capability-inventory]: Use a staged review of 05-CAPABILITY-INVENTORY.md, 05-ISOLATION-BOUNDARY.md, and 05-VALIDATION.md to prove ISO-01 instead of repo-root helper scripts.
 
 ### Pending Todos
 
@@ -77,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T01:23:14.586Z
-Stopped at: Completed 05-ts-backend-capability-inventory-01-PLAN.md
+Last session: 2026-04-08T01:28:24.055Z
+Stopped at: Completed 05-ts-backend-capability-inventory-02-PLAN.md
 Resume file: None

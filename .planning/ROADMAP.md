@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 Plans:
 - [x] 05-01-PLAN.md — Create the source-cited TypeScript backend capability inventory and classification matrix.
-- [ ] 05-02-PLAN.md — Write the explicit isolation boundary and refresh the phase validation guardrails for ISO-01.
+- [x] 05-02-PLAN.md — Write the explicit isolation boundary and refresh the phase validation guardrails for ISO-01.
 
 ### Phase 6: Standalone CLI Scaffold & Credential Discovery
 **Goal**: An isolated new CLI surface exists and can detect supported local Claude credential sources without confusing operators or mutating legacy codepaths.

@@ -27,7 +27,7 @@
 
 ### Isolation & Verification
 
-- [ ] **ISO-01**: Existing TypeScript gateway files, setup scripts, Rust daemon, Rust CLI, and desktop app remain behaviorally and structurally unchanged by the new CLI milestone.
+- [x] **ISO-01**: Existing TypeScript gateway files, setup scripts, Rust daemon, Rust CLI, and desktop app remain behaviorally and structurally unchanged by the new CLI milestone.
 - [ ] **ISO-02**: The new CLI lives in an isolated path or package with its own entrypoint and documentation, so operators can adopt it without affecting current TS or Rust flows.
 - [ ] **QLT-01**: Automated tests cover capability inventory classification, credential detection decisions, bootstrap artifact generation, and Claude launch environment preparation without requiring live OAuth traffic.
 - [ ] **QLT-02**: Checked-in operator guidance covers first-run bootstrap, repeat-run behavior, and recovery paths for missing credentials or missing `claude`.
@@ -55,7 +55,7 @@
 |-------------|-------|--------|
 | ANA-01 | Phase 5 | Complete |
 | ANA-02 | Phase 5 | Complete |
-| ISO-01 | Phase 5 | Pending |
+| ISO-01 | Phase 5 | Complete |
 | ENV-01 | Phase 6 | Pending |
 | ISO-02 | Phase 6 | Pending |
 | ENV-02 | Phase 7 | Pending |
