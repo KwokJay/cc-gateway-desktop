@@ -2,7 +2,7 @@ import { renderHelpText } from './output.js'
 
 const HELP_COMMANDS = new Set(['-h', '--help', 'help'])
 
-function shouldRenderHelp(argv: string[]): boolean {
+export function shouldRenderHelp(argv: string[]): boolean {
   return argv.length === 0 || HELP_COMMANDS.has(argv[0] ?? '')
 }
 
