@@ -238,22 +238,19 @@ This is the current outbound proxy capability that later bootstrap work must pre
 |---|-------|---------|---------------|
 | None | All material factual claims in this research were verified against the current codebase, planning docs, or local environment. | All sections | Low |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the checked-in capability inventory live only under `.planning/` or also be promoted into a longer-lived `docs/` path?**
    - What we know: The phase output needs to be checked in and auditable, but the user only mandated the research file location, not the eventual inventory artifact location. [VERIFIED: user prompt, output path]
-   - What's unclear: Whether later non-GSD users should consume the inventory from `.planning/` or a product-facing docs path.
-   - Recommendation: Plan Phase 5 to create the canonical artifact under `.planning/phases/05...` first, then optionally mirror or summarize it later if another phase needs product-facing docs. [VERIFIED: current GSD structure] (inference)
+   - Resolution: For Phase 5, the canonical capability inventory will live under `.planning/phases/05-ts-backend-capability-inventory/` so it stays attached to the phase package that future GSD workflows consume directly. A later phase may mirror it into `docs/` if a user-facing artifact is explicitly required. [VERIFIED: current GSD structure, phase packaging under `.planning/phases/05-ts-backend-capability-inventory/`] (inference)
 
 2. **How granular should the classification matrix be for rewrite behavior?**
    - What we know: The TS backend exposes both high-level capabilities like "rewrite `/v1/messages`" and fine-grained sub-behaviors like billing-header stripping, prompt env rewriting, and base64 additional_metadata sanitation. [VERIFIED: src/rewriter.ts, tests/rewriter.test.ts]
-   - What's unclear: Whether later planners need one row per endpoint, one row per rewrite family, or one row per exact mutation.
-   - Recommendation: Use one row per externally meaningful capability, with a secondary notes column for sub-behaviors, so the matrix stays readable while still surfacing important detail. [VERIFIED: ANA-01, ANA-02 in .planning/REQUIREMENTS.md] (inference)
+   - Resolution: Use one row per externally meaningful capability family, with the `Notes` column listing important sub-behaviors such as billing-header stripping, env rewriting, path rewriting, and metadata sanitation. This keeps the inventory readable while preserving the detail later phases need. [VERIFIED: ANA-01, ANA-02 in .planning/REQUIREMENTS.md, required matrix columns in Phase 5 planning] (inference)
 
 3. **Should remote-admin deployment flows be classified as `deferred` or `reference-only`?**
    - What we know: The current milestone is local-machine bootstrap and launch, and remote/self-hosted support remains a broader project constraint rather than a direct milestone requirement. [VERIFIED: .planning/PROJECT.md, .planning/ROADMAP.md]
-   - What's unclear: Whether `admin-setup.sh` and multi-client distribution behavior need explicit future work in this milestone or should only remain documented background.
-   - Recommendation: Default remote-admin deployment items to `deferred` unless a later phase requirement explicitly depends on them; keep purely local launcher/auth/config behaviors in `must-port` or `reference-only`. [VERIFIED: current milestone requirements] (inference)
+   - Resolution: Treat remote-admin deployment and multi-client distribution flows as `deferred` for this milestone unless a later requirement explicitly pulls them forward. Keep only local credential, config, bootstrap, and `claude` handoff behaviors in `must-port` or `reference-only` scope for the standalone CLI path. [VERIFIED: current milestone requirements, .planning/PROJECT.md, .planning/ROADMAP.md] (inference)
 
 ## Environment Availability
 
