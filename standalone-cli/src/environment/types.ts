@@ -58,3 +58,20 @@ export interface BootstrapSummary {
   configPath: string
   renderFingerprint: string
 }
+
+export type RuntimeAction = 'reused' | 'started' | 'restarted'
+
+export interface RuntimePreparationSummary {
+  action: RuntimeAction
+  pid: number
+  port: number
+  healthUrl: string
+  configPath: string
+  configFingerprint: string
+  builtGateway: boolean
+}
+
+export interface PreparedRuntimeSummary {
+  bootstrap: BootstrapSummary
+  runtime: RuntimePreparationSummary
+}

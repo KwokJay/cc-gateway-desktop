@@ -1,4 +1,5 @@
 import type { DiscoveryFailure, DiscoverySuccess } from './credential-discovery/types.js'
+import type { PreparedRuntimeSummary } from './environment/types.js'
 
 function formatSource(source: DiscoverySuccess['source'] | DiscoveryFailure['source']): string {
   return source === 'macos-keychain' ? 'macOS Keychain' : 'credentials file'
@@ -54,18 +55,43 @@ Usage:
   ccgw-standalone-cli -h
   ccgw-standalone-cli --help
   ccgw-standalone-cli discover-credentials
+  ccgw-standalone-cli prepare-runtime
 
-Phase 6 scope:
-  - additive standalone scaffold plus credential discovery only
+Phase 7 scope:
+  - additive standalone scaffold with credential discovery and proxy-aware runtime preparation
   - does not replace src/, scripts/, crates/core/, crates/daemon/, crates/cli/, or crates/desktop/
-  - excludes proxy startup, config generation, runtime preparation, and claude launch behavior
+  - excludes claude launch behavior and arbitrary passthrough arguments until Phase 8
 
 Commands:
   discover-credentials  Check macOS Keychain first on darwin, then the credentials file fallback
+  prepare-runtime       Create or reuse the standalone workspace, then wait for a healthy local gateway runtime
 
 Package-local verification:
   - npm --prefix standalone-cli run build
   - npx tsx standalone-cli/tests/cli-help.test.ts
   - npx tsx standalone-cli/tests/credential-discovery.test.ts
+  - npx tsx standalone-cli/tests/environment-bootstrap.test.ts
+  - npx tsx standalone-cli/tests/proxy-env.test.ts
+  - npx tsx standalone-cli/tests/runtime-preparation.test.ts
+`
+}
+
+export function renderPrepareRuntimeSuccess(summary: PreparedRuntimeSummary): string {
+  return `prepare-runtime: ready
+
+Workspace: ${summary.bootstrap.workspacePaths.workspaceRoot}
+Config path: ${summary.bootstrap.configPath}
+Runtime action: ${summary.runtime.action}
+Gateway health: ${summary.runtime.healthUrl}
+`
+}
+
+export function renderPrepareRuntimeFailure(detail: string): string {
+  return `prepare-runtime: failed
+
+Detail: ${detail}
+Next step:
+  Check local proxy env, credentials, and gateway build output
+  Retry ccgw-standalone-cli prepare-runtime
 `
 }

@@ -35,7 +35,7 @@ async function captureRun(argv: string[]): Promise<CapturedRun> {
 }
 
 function assertHelpContract(helpText: string): void {
-  assert.ok(helpText.includes('additive standalone scaffold plus credential discovery only'))
+  assert.ok(helpText.includes('additive standalone scaffold with credential discovery and proxy-aware runtime preparation'))
   assert.ok(
     helpText.includes(
       'does not replace src/, scripts/, crates/core/, crates/daemon/, crates/cli/, or crates/desktop/',
@@ -44,7 +44,11 @@ function assertHelpContract(helpText: string): void {
   assert.ok(helpText.includes('npm --prefix standalone-cli run build'))
   assert.ok(helpText.includes('npx tsx standalone-cli/tests/cli-help.test.ts'))
   assert.ok(helpText.includes('npx tsx standalone-cli/tests/credential-discovery.test.ts'))
-  assert.ok(helpText.includes('excludes proxy startup, config generation, runtime preparation, and claude launch behavior'))
+  assert.ok(helpText.includes('npx tsx standalone-cli/tests/environment-bootstrap.test.ts'))
+  assert.ok(helpText.includes('npx tsx standalone-cli/tests/proxy-env.test.ts'))
+  assert.ok(helpText.includes('npx tsx standalone-cli/tests/runtime-preparation.test.ts'))
+  assert.ok(helpText.includes('prepare-runtime'))
+  assert.ok(helpText.includes('excludes claude launch behavior and arbitrary passthrough arguments until Phase 8'))
   assert.ok(!helpText.includes('replaces the legacy TypeScript gateway'))
 }
 
