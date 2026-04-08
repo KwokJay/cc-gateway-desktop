@@ -290,17 +290,15 @@ Source: legacy scripts already use this recovery action and source list as the o
 | A2 | Phase 6 should not add repo-root convenience scripts yet, because package-local invocation reduces operator confusion during the additive scaffold stage. [ASSUMED] | User Constraints / Architecture Patterns | Low — root convenience scripts can be added later if adoption ergonomics matter more than strict package locality. |
 | A3 | The standalone CLI should use TS-native parsing instead of reproducing shell + Python extraction behavior verbatim. [ASSUMED] | Standard Stack / Don't Hand-Roll | Low — even if implementation details differ, the discovery order and operator-facing contract remain the real locked behavior. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **What should the public command name be during the additive stage?**
    - What we know: the root repo already has a Rust `ccg` launcher, and Phase 6 must avoid confusing operators about replacement status. [VERIFIED: repo files]
-   - What's unclear: whether the new package should expose a temporary distinct binary name such as `ccg-local-cli`, `ccg-bootstrap`, or no global bin at all yet. [ASSUMED]
-   - Recommendation: keep the package-local entrypoint distinct from `ccg` in Phase 6 and delay any command-name convergence until later phases prove the flow. [ASSUMED]
+   - Resolution: keep the Phase 6 command package-local and distinct from `ccg`, with no claim of replacing the Rust launcher yet. The plan should favor a temporary additive binary name inside the isolated package and defer any public command-name convergence until later phases prove the end-to-end flow. [ASSUMED]
 
 2. **Should the CLI treat malformed credential JSON as “no credentials” or as a distinct schema-drift failure?**
    - What we know: legacy scripts assume the `claudeAiOauth` structure and report that raw structure may have changed when extraction fails. [VERIFIED: repo files]
-   - What's unclear: whether operator UX is better when schema drift is shown as a separate failure from “not found”. [ASSUMED]
-   - Recommendation: keep separate error categories so operators can distinguish missing login state from credential-format drift. [ASSUMED]
+   - Resolution: treat malformed credential JSON as a distinct schema or parse failure, not as generic “not found”, so operators can tell the difference between “you have not logged in” and “the credential shape changed”. [ASSUMED]
 
 ## Environment Availability
 
