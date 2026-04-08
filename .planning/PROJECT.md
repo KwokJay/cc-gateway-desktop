@@ -22,13 +22,14 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 - ✓ Keep a checked-in, source-cited inventory of the legacy TS backend plus an explicit isolation boundary for the standalone CLI milestone — validated in Phase 5 via `.planning/phases/05-ts-backend-capability-inventory/05-CAPABILITY-INVENTORY.md` and `05-ISOLATION-BOUNDARY.md`
 - ✓ Ship an isolated top-level `standalone-cli/` package with additive help/docs and typed credential-discovery contracts — validated in Phase 6 via `standalone-cli/` plus `.planning/phases/06-standalone-cli-scaffold-credential-discovery/VERIFICATION.md`
 - ✓ Detect supported local Claude credential sources in deterministic order with typed parse failures and secret-safe output — validated in Phase 6 via `standalone-cli/src/credential-discovery/*` and `.planning/phases/06-standalone-cli-scaffold-credential-discovery/VERIFICATION.md`
+- ✓ Generate or reuse a standalone CLI-owned bootstrap workspace, manifest, and legacy-compatible config without repo-root side effects — validated in Phase 7 via `standalone-cli/src/environment/bootstrap.ts` and `.planning/phases/07-local-environment-construction-runtime-preparation/VERIFICATION.md`
+- ✓ Prepare a proxy-aware, health-gated local runtime before any Claude launch handoff — validated in Phase 7 via `standalone-cli/src/environment/proxy-env.ts`, `runtime.ts`, `prepare.ts`, and `.planning/phases/07-local-environment-construction-runtime-preparation/VERIFICATION.md`
 
 ### Active
 
 - Launch the locally installed `claude` executable automatically after bootstrap succeeds, with the required gateway-oriented environment variables
 - Keep the existing TypeScript gateway, Rust daemon, Rust CLI, and desktop app unchanged while the new CLI is developed in an isolated path
 - Add verification and operator guidance for first-run bootstrap, repeat-run idempotency, and launch failure handling
-- Generate or reuse local bootstrap artifacts and runtime state for a gateway-backed Claude Code session
 
 ### Out of Scope
 
@@ -70,6 +71,8 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 | Use code, scripts, config, and tests as the source of truth when README narrative drifts      | Phase 5 verified multiple documentation drifts that would mislead later CLI work if README prose were treated as canonical                                     | ✓ Good     |
 | Build the new CLI in a top-level `standalone-cli/` package with package-local tests and docs  | Phase 6 proved the safest additive boundary is a separate package rather than extending protected legacy paths                                                  | ✓ Good     |
 | Keep credential discovery deterministic and secret-safe                                        | Phase 6 validated Keychain-first/file-fallback detection with typed parse failures and no raw token output                                                     | ✓ Good     |
+| Use a CLI-owned workspace and manifest as the durable bootstrap source of truth               | Phase 7 validated idempotent reruns and legacy-compatible config rendering without recreating repo-root shell side effects                                     | ✓ Good     |
+| Gate runtime readiness on `/_health` instead of process spawn alone                           | Phase 7 validated that launch handoff should only happen after a proxy-aware healthy runtime is available                                                      | ✓ Good     |
 
 
 ## Current Milestone: v1.1 Standalone Claude Bootstrap CLI
@@ -104,4 +107,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-08 after Phase 6 completion*
+*Last updated: 2026-04-08 after Phase 7 completion*
