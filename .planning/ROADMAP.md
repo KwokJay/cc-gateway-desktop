@@ -84,7 +84,10 @@ Plans:
   1. Automated tests cover capability inventory classification, credential detection decisions, bootstrap artifact generation, and launch environment preparation.
   2. Checked-in operator guidance explains first-run bootstrap, repeat-run behavior, and recovery for missing credentials or missing `claude`.
   3. The validation surface does not require live OAuth traffic to prove core CLI behavior.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 09-01-PLAN.md — Add the aggregate standalone validation command and the Phase 05 capability-inventory contract test.
+- [ ] 09-02-PLAN.md — Make `standalone-cli/README.md` canonical, reduce the repo doc to a pointer, and lock operator guidance with a docs contract test.
 
 ## Progress
 
