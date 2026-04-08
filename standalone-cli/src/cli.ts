@@ -1,7 +1,11 @@
+import { createInterface } from 'node:readline/promises'
+import { stdin, stdout } from 'node:process'
+
 import { discoverCredentials } from './credential-discovery/discover.js'
 import { readBootstrapManifest } from './environment/manifest.js'
 import { prepareRuntimeEnvironment } from './environment/prepare.js'
 import type { PreparedRuntimeSummary } from './environment/types.js'
+import { resolveWorkspacePaths } from './environment/workspace.js'
 import { launchClaude } from './launch/claude.js'
 import {
   renderClaudeLaunchFailure,
@@ -9,6 +13,9 @@ import {
   renderDiscoverySuccess,
   renderHelpText,
   renderPrepareRuntimeFailure,
+  renderPrepareRuntimeLaunchPrompt,
+  renderPrepareRuntimeLaunchRejectNotice,
+  renderPrepareRuntimeLaunchSkipNotice,
   renderPrepareRuntimeSuccess,
 } from './output.js'
 
@@ -20,7 +27,9 @@ export interface CliDependencies {
   discoverCredentials?: typeof discoverCredentials
   prepareRuntimeEnvironment?: typeof prepareRuntimeEnvironment
   readBootstrapManifest?: typeof readBootstrapManifest
+  resolveWorkspacePaths?: typeof resolveWorkspacePaths
   launchClaude?: typeof launchClaude
+  resolvePrepareRuntimeFailure?: (detail: string) => Promise<'skip' | 'reject'>
 }
 
 export function shouldRenderHelp(argv: string[]): boolean {
@@ -39,11 +48,62 @@ function deriveGatewayUrl(summary: PreparedRuntimeSummary): string {
   }
 }
 
+function deriveGatewayUrlFromManifest(
+  manifest: Awaited<ReturnType<typeof readBootstrapManifest>>,
+): string {
+  if (manifest?.runtime?.healthUrl) {
+    try {
+      return new URL(manifest.runtime.healthUrl).origin
+    } catch {
+      // fall through to port-based fallback
+    }
+  }
+
+  if (manifest?.runtime?.port !== undefined) {
+    return `http://127.0.0.1:${manifest.runtime.port}`
+  }
+
+  return 'http://127.0.0.1:8443'
+}
+
+async function promptForPrepareRuntimeFailure(detail: string): Promise<'skip' | 'reject'> {
+  if (!stdin.isTTY || !stdout.isTTY) {
+    process.stderr.write(renderPrepareRuntimeLaunchRejectNotice())
+    return 'reject'
+  }
+
+  const rl = createInterface({
+    input: stdin,
+    output: stdout,
+  })
+
+  try {
+    process.stderr.write(renderPrepareRuntimeLaunchPrompt(detail))
+
+    while (true) {
+      const answer = (await rl.question('Enter choice [skip/reject]: ')).trim().toLowerCase()
+
+      if (answer === 'skip' || answer === 's') {
+        return 'skip'
+      }
+
+      if (answer === 'reject' || answer === 'r' || answer === '') {
+        return 'reject'
+      }
+    }
+  } finally {
+    rl.close()
+  }
+}
+
 export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<number> {
   const discover = dependencies.discoverCredentials ?? discoverCredentials
   const prepareRuntime = dependencies.prepareRuntimeEnvironment ?? prepareRuntimeEnvironment
   const readManifest = dependencies.readBootstrapManifest ?? readBootstrapManifest
+  const resolvePaths = dependencies.resolveWorkspacePaths ?? resolveWorkspacePaths
   const handoffToClaude = dependencies.launchClaude ?? launchClaude
+  const handlePrepareFailure =
+    dependencies.resolvePrepareRuntimeFailure ?? promptForPrepareRuntimeFailure
 
   if (shouldRenderHelp(argv)) {
     process.stdout.write(renderHelpText())
@@ -95,24 +155,70 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     return 1
   }
 
-  try {
-    const summary = await prepareRuntime(result.credentials)
-    const manifest = await readManifest(summary.bootstrap.workspacePaths)
+  let preparedSummary: PreparedRuntimeSummary
 
-    if (!manifest) {
-      throw new Error(`Bootstrap manifest missing at ${summary.bootstrap.workspacePaths.manifestPath}`)
+  try {
+    preparedSummary = await prepareRuntime(result.credentials)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const decision = await handlePrepareFailure(message)
+
+    if (decision === 'reject') {
+      process.stderr.write(renderPrepareRuntimeLaunchRejectNotice())
+      return 1
     }
 
+    process.stderr.write(renderPrepareRuntimeLaunchSkipNotice())
+
+    const workspacePaths = resolvePaths()
+    const manifest = await readManifest(workspacePaths)
+
+    if (!manifest) {
+      process.stderr.write(
+        renderClaudeLaunchFailure(
+          `${message}\nBootstrap manifest missing at ${workspacePaths.manifestPath}; cannot continue launch after skipping runtime preparation.`,
+        ),
+      )
+      return 1
+    }
+
+    try {
+      return await handoffToClaude({
+        args: [...argv],
+        clientToken: manifest.client.token,
+        cwd: process.cwd(),
+        env: process.env,
+        gatewayUrl: deriveGatewayUrlFromManifest(manifest),
+      })
+    } catch (launchError) {
+      const launchMessage = launchError instanceof Error ? launchError.message : String(launchError)
+      process.stderr.write(renderClaudeLaunchFailure(launchMessage))
+      return 1
+    }
+  }
+
+  const manifest = await readManifest(preparedSummary.bootstrap.workspacePaths)
+
+  if (!manifest) {
+    process.stderr.write(
+      renderClaudeLaunchFailure(
+        `Bootstrap manifest missing at ${preparedSummary.bootstrap.workspacePaths.manifestPath}`,
+      ),
+    )
+    return 1
+  }
+
+  try {
     return await handoffToClaude({
       args: [...argv],
       clientToken: manifest.client.token,
       cwd: process.cwd(),
       env: process.env,
-      gatewayUrl: deriveGatewayUrl(summary),
+      gatewayUrl: deriveGatewayUrl(preparedSummary),
     })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    process.stderr.write(renderClaudeLaunchFailure(message))
+  } catch (launchError) {
+    const launchMessage = launchError instanceof Error ? launchError.message : String(launchError)
+    process.stderr.write(renderClaudeLaunchFailure(launchMessage))
     return 1
   }
 }

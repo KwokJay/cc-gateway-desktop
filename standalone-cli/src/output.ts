@@ -101,6 +101,25 @@ Next step:
 `
 }
 
+export function renderPrepareRuntimeLaunchPrompt(detail: string): string {
+  return `prepare-runtime: failed before Claude launch
+
+Detail: ${detail}
+
+Choose how to proceed:
+  skip   Ignore the runtime-preparation error and try to launch Claude anyway
+  reject Stop here and exit without launching Claude
+`
+}
+
+export function renderPrepareRuntimeLaunchSkipNotice(): string {
+  return 'prepare-runtime: skipping runtime-preparation failure and attempting Claude launch anyway\n'
+}
+
+export function renderPrepareRuntimeLaunchRejectNotice(): string {
+  return 'prepare-runtime: launch rejected by user; exiting without starting Claude\n'
+}
+
 export function renderClaudeLaunchFailure(detail: string): string {
   return `claude launch: failed
 

@@ -248,4 +248,54 @@ async function captureRun(
   assert.match(result.stderr, /@anthropic-ai\/claude-code/i)
 }
 
+{
+  const manifest = fixtureManifest()
+  const launchCalls: unknown[] = []
+
+  const result = await captureRun(['--print', 'hello'], {
+    discoverCredentials: async () => ({
+      ok: true,
+      source: 'credentials-file',
+      credentials: fixtureCredentials(),
+    }),
+    prepareRuntimeEnvironment: async () => {
+      throw new Error('Gateway readiness timed out while waiting for http://127.0.0.1:8443/_health')
+    },
+    resolveWorkspacePaths: () => manifest.paths,
+    readBootstrapManifest: async () => manifest,
+    resolvePrepareRuntimeFailure: async () => 'skip',
+    launchClaude: async (input: unknown) => {
+      launchCalls.push(input)
+      return 0
+    },
+  })
+
+  assert.equal(result.exitCode, 0)
+  assert.match(result.stderr, /skip/i)
+  assert.equal(launchCalls.length, 1)
+  assert.equal((launchCalls[0] as { clientToken: string }).clientToken, manifest.client.token)
+  assert.equal((launchCalls[0] as { gatewayUrl: string }).gatewayUrl, 'http://127.0.0.1:8443')
+}
+
+{
+  const result = await captureRun(['--print', 'hello'], {
+    discoverCredentials: async () => ({
+      ok: true,
+      source: 'credentials-file',
+      credentials: fixtureCredentials(),
+    }),
+    prepareRuntimeEnvironment: async () => {
+      throw new Error('Gateway readiness timed out while waiting for http://127.0.0.1:8443/_health')
+    },
+    resolvePrepareRuntimeFailure: async () => 'reject',
+    launchClaude: async () => {
+      assert.fail('launchClaude must not run when the user rejects launch after prepare-runtime failure')
+    },
+  })
+
+  assert.equal(result.exitCode, 1)
+  assert.match(result.stderr, /rejected by user/i)
+  assert.doesNotMatch(result.stderr, /@anthropic-ai\/claude-code/i)
+}
+
 console.log('claude-launch.test.ts: ok')
