@@ -86,7 +86,7 @@ Plans:
   3. The validation surface does not require live OAuth traffic to prove core CLI behavior.
 **Plans**: 2 plans
 Plans:
-- [ ] 09-01-PLAN.md — Add the aggregate standalone validation command and the Phase 05 capability-inventory contract test.
+- [x] 09-01-PLAN.md — Add the aggregate standalone validation command and the Phase 05 capability-inventory contract test.
 - [ ] 09-02-PLAN.md — Make `standalone-cli/README.md` canonical, reduce the repo doc to a pointer, and lock operator guidance with a docs contract test.
 
 ## Progress

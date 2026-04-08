@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 08 complete and ready to plan Phase 09.
-last_updated: "2026-04-08T09:30:14.503Z"
-last_activity: 2026-04-08 -- Phase 09 planning complete
+stopped_at: Completed 09-validation-operator-guidance-01-PLAN.md
+last_updated: "2026-04-08T09:44:27.108Z"
+last_activity: 2026-04-08
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 10
-  completed_plans: 8
-  percent: 80
+  completed_plans: 9
+  percent: 90
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Operators can run Claude Code through one trusted gateway that presents a stable canonical identity and does not leak surprising telemetry or operational state.
-**Current focus:** Phase 9 - Validation & Operator Guidance
+**Current focus:** Phase 09 — Validation & Operator Guidance
 
 ## Current Position
 
-Phase: 9 of 9 (Validation & Operator Guidance)
-Plan: 2 of 2 in current phase
+Phase: 09 (Validation & Operator Guidance) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-04-08 -- Phase 09 planning complete with two verified plans for validation and operator guidance.
+Last activity: 2026-04-08
 
 Progress: [████████░░] 80%
 
@@ -53,6 +53,8 @@ Progress: [████████░░] 80%
 
 - Last 5 plans: 06-02 (5 min), 07-01 (7 min), 07-02 (6 min), 08-01 (10 min), 08-02 (8 min)
 - Trend: Stable
+
+| Phase 09-validation-operator-guidance P01 | 9min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +84,7 @@ Recent decisions affecting current work:
 - [Phase 08-claude-launch-handoff]: Keep bare invocation and non-command argv on the same discover→prepare→manifest→launch path so the standalone launch surface cannot drift.
 - [Phase 08-claude-launch-handoff]: Derive the client token from the CLI-owned manifest and ANTHROPIC_BASE_URL from prepared runtime health state instead of introducing a second handoff state store.
 - [Phase 08-claude-launch-handoff]: Use direct child-process spawn with shell disabled for Claude handoff so argv passthrough stays exact and shell injection risk stays out of scope.
+- [Phase 09-validation-operator-guidance]: Treat 05-CAPABILITY-INVENTORY.md as executable contract data and fail validation when Phase 9-critical rows or Known Drift disappear.
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08
-Stopped at: Phase 08 complete and ready to plan Phase 09.
+Last session: 2026-04-08T09:44:27.104Z
+Stopped at: Completed 09-validation-operator-guidance-01-PLAN.md
 Resume file: None
