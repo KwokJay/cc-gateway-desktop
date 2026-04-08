@@ -19,14 +19,14 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 - ✓ Refresh Anthropic OAuth centrally inside the gateway instead of on client machines — existing via `src/oauth.ts` and `crates/core/src/oauth.rs`
 - ✓ Support canonical-profile driven configuration, outbound proxy settings, and local config files — existing via `config.example.yaml`, `src/config.ts`, and `crates/core/src/config.rs`
 - ✓ Ship multiple operator surfaces (daemon, CLI, desktop) around the same gateway domain — existing via `crates/daemon/`, `crates/cli/`, and `crates/desktop/`
+- ✓ Keep a checked-in, source-cited inventory of the legacy TS backend plus an explicit isolation boundary for the standalone CLI milestone — validated in Phase 5 via `.planning/phases/05-ts-backend-capability-inventory/05-CAPABILITY-INVENTORY.md` and `05-ISOLATION-BOUNDARY.md`
 
 ### Active
 
-- [ ] Inventory the full TypeScript backend feature surface that matters to local bootstrap, auth, config, rewrite, and launch flows
-- [ ] Build a new standalone CLI that can detect local Claude Code credentials and construct a usable local working environment
-- [ ] Launch the locally installed `claude` executable automatically after bootstrap succeeds, with the required gateway-oriented environment variables
-- [ ] Keep the existing TypeScript gateway, Rust daemon, Rust CLI, and desktop app unchanged while the new CLI is developed in an isolated path
-- [ ] Add verification and operator guidance for first-run bootstrap, repeat-run idempotency, and launch failure handling
+- Build a new standalone CLI that can detect local Claude Code credentials and construct a usable local working environment
+- Launch the locally installed `claude` executable automatically after bootstrap succeeds, with the required gateway-oriented environment variables
+- Keep the existing TypeScript gateway, Rust daemon, Rust CLI, and desktop app unchanged while the new CLI is developed in an isolated path
+- Add verification and operator guidance for first-run bootstrap, repeat-run idempotency, and launch failure handling
 
 ### Out of Scope
 
@@ -55,21 +55,25 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 
 ## Key Decisions
 
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Initialize as a brownfield project | Existing code, docs, and operator workflows already define the product; planning should start from reality instead of a blank slate | ✓ Good |
-| Treat the current planning effort as a stabilization + hardening milestone | The clearest repo risks are operational trust, secret handling, lifecycle safety, and parity drift, not missing greenfield feature discovery | — Pending |
-| Use recommended GSD defaults with planning docs committed to git | The user asked to proceed without friction, and committed planning artifacts make future sessions reproducible despite `.planning/` being gitignored by default | ✓ Good |
-| Keep the TypeScript gateway as a reference surface until Rust parity and coverage are explicit | Immediate deletion would be risky while parity work is still documented as active | ⚠️ Revisit |
-| Start milestone v1.1 around a standalone bootstrap CLI derived from the TypeScript backend | The user explicitly wants the TypeScript app analyzed and a new CLI built from its core behaviors | — Pending |
-| Keep legacy TypeScript and Rust program codepaths unchanged while building the new CLI | The new work should add an isolated surface, not destabilize the existing products | ✓ Good |
-| Continue roadmap numbering at Phase 5 for the new milestone | Preserves planning history instead of silently resetting prior roadmap numbering | ✓ Good |
+
+| Decision                                                                                       | Rationale                                                                                                                                                       | Outcome    |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Initialize as a brownfield project                                                             | Existing code, docs, and operator workflows already define the product; planning should start from reality instead of a blank slate                             | ✓ Good     |
+| Treat the current planning effort as a stabilization + hardening milestone                     | The clearest repo risks are operational trust, secret handling, lifecycle safety, and parity drift, not missing greenfield feature discovery                    | — Pending  |
+| Use recommended GSD defaults with planning docs committed to git                               | The user asked to proceed without friction, and committed planning artifacts make future sessions reproducible despite `.planning/` being gitignored by default | ✓ Good     |
+| Keep the TypeScript gateway as a reference surface until Rust parity and coverage are explicit | Immediate deletion would be risky while parity work is still documented as active                                                                               | ⚠️ Revisit |
+| Start milestone v1.1 around a standalone bootstrap CLI derived from the TypeScript backend     | The user explicitly wants the TypeScript app analyzed and a new CLI built from its core behaviors                                                               | — Pending  |
+| Keep legacy TypeScript and Rust program codepaths unchanged while building the new CLI         | The new work should add an isolated surface, not destabilize the existing products                                                                              | ✓ Good     |
+| Continue roadmap numbering at Phase 5 for the new milestone                                    | Preserves planning history instead of silently resetting prior roadmap numbering                                                                                | ✓ Good     |
+| Use code, scripts, config, and tests as the source of truth when README narrative drifts      | Phase 5 verified multiple documentation drifts that would mislead later CLI work if README prose were treated as canonical                                     | ✓ Good     |
+
 
 ## Current Milestone: v1.1 Standalone Claude Bootstrap CLI
 
 **Goal:** Extract the useful TypeScript backend bootstrap and launch behaviors into a new standalone CLI that can prepare a local Claude Code environment and then launch the installed `claude` executable, without changing the existing TypeScript or Rust programs.
 
 **Target features:**
+
 - Analyze the TypeScript backend's runtime, setup, auth, config, and launch capabilities and classify what the new CLI must preserve
 - Detect local Claude Code credentials from supported sources and build the local bootstrap artifacts needed for a gateway-backed session
 - Prepare or start the local runtime state needed by the bootstrap flow, then launch the installed `claude` binary automatically
@@ -80,6 +84,7 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 This document evolves at phase transitions and milestone boundaries.
 
 **After each phase transition** (via `/gsd-transition`):
+
 1. Requirements invalidated? → Move to Out of Scope with reason
 2. Requirements validated? → Move to Validated with phase reference
 3. New requirements emerged? → Add to Active
@@ -87,10 +92,12 @@ This document evolves at phase transitions and milestone boundaries.
 5. "What This Is" still accurate? → Update if drifted
 
 **After each milestone** (via `/gsd-complete-milestone`):
+
 1. Full review of all sections
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after starting milestone v1.1*
+
+*Last updated: 2026-04-08 after Phase 5 completion*

@@ -14,7 +14,7 @@ Phase numbering continues from the prior roadmap, so this milestone begins at Ph
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 5: TS Backend Capability Inventory** - Inventory the TypeScript backend feature surface and lock the boundary for the new standalone CLI.
+- [x] **Phase 5: TS Backend Capability Inventory** - Inventory the TypeScript backend feature surface and lock the boundary for the new standalone CLI.
 - [ ] **Phase 6: Standalone CLI Scaffold & Credential Discovery** - Create an isolated CLI entrypoint and detect supported local Claude credential sources safely.
 - [ ] **Phase 7: Local Environment Construction & Runtime Preparation** - Build or reuse bootstrap artifacts and prepare the runtime state required before launch.
 - [ ] **Phase 8: Claude Launch Handoff** - Launch the installed `claude` executable through the prepared environment with full argument passthrough and failure handling.
@@ -84,7 +84,7 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. TS Backend Capability Inventory | 0/2 | Not started | - |
+| 5. TS Backend Capability Inventory | 2/2 | Complete | 2026-04-08 |
 | 6. Standalone CLI Scaffold & Credential Discovery | 0/TBD | Not started | - |
 | 7. Local Environment Construction & Runtime Preparation | 0/TBD | Not started | - |
 | 8. Claude Launch Handoff | 0/TBD | Not started | - |

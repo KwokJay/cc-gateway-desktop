@@ -1,7 +1,7 @@
 ---
 phase: 5
 slug: ts-backend-capability-inventory
-status: draft
+status: approved
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-04-08
@@ -66,10 +66,10 @@ An equivalent Phase 05 commit-range review is acceptable only if it covers those
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 05-01-01 | 01 | 1 | ANA-01 | T-05-01 | Inventory claims stay source-cited and evidence-backed | manual + regression support | `npm test && npx tsx tests/config.test.ts` | ✅ | ⬜ pending |
-| 05-01-02 | 01 | 1 | ANA-02 | T-05-02 | Every capability row has an explicit classification and downstream rationale | document check | `rg -n "must-port|reference-only|deferred" .planning/phases/05-ts-backend-capability-inventory/05-CAPABILITY-INVENTORY.md` | ✅ | ⬜ pending |
-| 05-02-01 | 02 | 2 | ISO-01 | T-05-02-01 | Boundary artifact explicitly protects legacy TS, script, Rust, and desktop paths | document check | `test -f .planning/phases/05-ts-backend-capability-inventory/05-ISOLATION-BOUNDARY.md && rg -n "^## Protected Legacy Paths$|src/|scripts/|crates/core/|crates/daemon/|crates/cli/|crates/desktop/" .planning/phases/05-ts-backend-capability-inventory/05-ISOLATION-BOUNDARY.md` | ✅ | ⬜ pending |
-| 05-02-02 | 02 | 2 | ISO-01 | T-05-02-02, T-05-02-03 | Validation instructions prove scope and regression coverage without repo-root helper scripts | regression + scope review | `npm test && npx tsx tests/config.test.ts && npm run build` plus `git add .planning/phases/05-ts-backend-capability-inventory/05-CAPABILITY-INVENTORY.md .planning/phases/05-ts-backend-capability-inventory/05-ISOLATION-BOUNDARY.md .planning/phases/05-ts-backend-capability-inventory/05-VALIDATION.md` then `git diff --name-only --cached -- | rg -n '^(src/|scripts/|crates/core/|crates/daemon/|crates/cli/|crates/desktop/)'` | ✅ | ⬜ pending |
+| 05-01-01 | 01 | 1 | ANA-01 | T-05-01 | Inventory claims stay source-cited and evidence-backed | manual + regression support | `npm test && npx tsx tests/config.test.ts` | ✅ | ✅ green |
+| 05-01-02 | 01 | 1 | ANA-02 | T-05-02 | Every capability row has an explicit classification and downstream rationale | document check | `rg -n "must-port|reference-only|deferred" .planning/phases/05-ts-backend-capability-inventory/05-CAPABILITY-INVENTORY.md` | ✅ | ✅ green |
+| 05-02-01 | 02 | 2 | ISO-01 | T-05-02-01 | Boundary artifact explicitly protects legacy TS, script, Rust, and desktop paths | document check | `test -f .planning/phases/05-ts-backend-capability-inventory/05-ISOLATION-BOUNDARY.md && rg -n "^## Protected Legacy Paths$|src/|scripts/|crates/core/|crates/daemon/|crates/cli/|crates/desktop/" .planning/phases/05-ts-backend-capability-inventory/05-ISOLATION-BOUNDARY.md` | ✅ | ✅ green |
+| 05-02-02 | 02 | 2 | ISO-01 | T-05-02-02, T-05-02-03 | Validation instructions prove scope and regression coverage without repo-root helper scripts | regression + scope review | `npm test && npx tsx tests/config.test.ts && npm run build` plus `git add .planning/phases/05-ts-backend-capability-inventory/05-CAPABILITY-INVENTORY.md .planning/phases/05-ts-backend-capability-inventory/05-ISOLATION-BOUNDARY.md .planning/phases/05-ts-backend-capability-inventory/05-VALIDATION.md` then `git diff --name-only --cached -- | rg -n '^(src/|scripts/|crates/core/|crates/daemon/|crates/cli/|crates/desktop/)'` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -94,4 +94,4 @@ An equivalent Phase 05 commit-range review is acceptable only if it covers those
 - [x] Feedback latency remains bounded to the existing root TS checks plus a short scope review
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending final execution evidence
+**Approval:** approved 2026-04-08
