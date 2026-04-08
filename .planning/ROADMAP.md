@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The milestone records an explicit boundary stating that existing TypeScript and Rust program paths remain unchanged while the new CLI is developed.
 **Plans**: 2 plans
 Plans:
-- [ ] 05-01-PLAN.md — Create the source-cited TypeScript backend capability inventory and classification matrix.
+- [x] 05-01-PLAN.md — Create the source-cited TypeScript backend capability inventory and classification matrix.
 - [ ] 05-02-PLAN.md — Write the explicit isolation boundary and refresh the phase validation guardrails for ISO-01.
 
 ### Phase 6: Standalone CLI Scaffold & Credential Discovery

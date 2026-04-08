@@ -7,8 +7,8 @@
 
 ### Capability Analysis
 
-- [ ] **ANA-01**: Operator can read a checked-in inventory of the TypeScript backend's runtime, setup, auth, config, and launch capabilities that matter to the new CLI.
-- [ ] **ANA-02**: Each analyzed TypeScript capability is classified as must-port, reference-only, or deferred for the new CLI milestone.
+- [x] **ANA-01**: Operator can read a checked-in inventory of the TypeScript backend's runtime, setup, auth, config, and launch capabilities that matter to the new CLI.
+- [x] **ANA-02**: Each analyzed TypeScript capability is classified as must-port, reference-only, or deferred for the new CLI milestone.
 
 ### Environment Bootstrap
 
@@ -53,8 +53,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ANA-01 | Phase 5 | Pending |
-| ANA-02 | Phase 5 | Pending |
+| ANA-01 | Phase 5 | Complete |
+| ANA-02 | Phase 5 | Complete |
 | ISO-01 | Phase 5 | Pending |
 | ENV-01 | Phase 6 | Pending |
 | ISO-02 | Phase 6 | Pending |

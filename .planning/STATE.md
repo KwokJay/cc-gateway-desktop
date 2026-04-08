@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Milestone v1.1 roadmap initialized and Phase 5 set as the next planning target.
-last_updated: "2026-04-08T01:11:29.633Z"
-last_activity: 2026-04-08 -- Phase 05 planning complete
+stopped_at: Completed 05-ts-backend-capability-inventory-01-PLAN.md
+last_updated: "2026-04-08T01:23:14.596Z"
+last_activity: 2026-04-08
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 50
 ---
 
 # Project State
@@ -21,35 +21,35 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Operators can run Claude Code through one trusted gateway that presents a stable canonical identity and does not leak surprising telemetry or operational state.
-**Current focus:** Phase 5 - TS Backend Capability Inventory
+**Current focus:** Phase 05 — TS Backend Capability Inventory
 
 ## Current Position
 
-Phase: 5 of 9 (TS Backend Capability Inventory)
-Plan: 2 of 2 in current phase
-Status: Ready to execute
-Last activity: 2026-04-08 -- Phase 05 planning complete
+Phase: 05 (TS Backend Capability Inventory) — EXECUTING
+Plan: 2 of 2
+Status: Executing Phase 05
+Last activity: 2026-04-08 -- Completed Plan 05-01
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
 
 - Total plans completed: 0
-- Average duration: 0 min
-- Total execution time: 0.0 hours
+- Average duration: 9 min
+- Total execution time: 0.2 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 05 | 1 | 9 min | 9 min |
 
 **Recent Trend:**
 
-- Last 5 plans: none
-- Trend: Baseline not established
+- Last 5 plans: 05-01 (9 min)
+- Trend: Baseline forming
 
 ## Accumulated Context
 
@@ -62,6 +62,8 @@ Recent decisions affecting current work:
 - Start milestone v1.1 around a standalone bootstrap CLI derived from the TypeScript backend feature surface.
 - Keep the existing TypeScript and Rust program paths unchanged while building the new CLI in an isolated path.
 - Keep the TypeScript gateway as a reference surface until Rust parity and coverage are explicit.
+- [Phase 05-ts-backend-capability-inventory]: Use code, scripts, config, and tests as the authority when README narrative drifts.
+- [Phase 05-ts-backend-capability-inventory]: Classify each legacy TS capability by its concrete Phase 6 through Phase 9 consumer, not by proxy importance alone.
 
 ### Pending Todos
 
@@ -75,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08 00:18
-Stopped at: Phase 05 planning completed and the phase is ready to execute.
+Last session: 2026-04-08T01:23:14.586Z
+Stopped at: Completed 05-ts-backend-capability-inventory-01-PLAN.md
 Resume file: None
