@@ -106,7 +106,9 @@ assertIncludesAny(
   readme,
   [
     'Retry ccgw-standalone-cli discover-credentials',
+    'Retry `ccgw-standalone-cli discover-credentials`',
     'Retry ccgw-standalone-cli',
+    'Retry `ccgw-standalone-cli`',
   ],
   'standalone-cli/README.md missing-credentials retry guidance',
 )
