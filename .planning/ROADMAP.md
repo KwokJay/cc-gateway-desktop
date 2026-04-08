@@ -43,7 +43,10 @@ Plans:
   1. The new CLI lives in its own path or package with its own entrypoint and operator-facing docs.
   2. The CLI checks the supported local Claude credential sources in a deterministic order and reports actionable failures when nothing usable is found.
   3. Operators can tell from the code and docs that the new CLI is additive and does not replace the existing TypeScript gateway or Rust products.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 06-01-PLAN.md — Create the isolated `standalone-cli/` package scaffold, shared contracts, and additive operator help/docs surface.
+- [ ] 06-02-PLAN.md — Implement deterministic credential discovery, typed parse/error handling, and fixture-driven verification inside the isolated package.
 
 ### Phase 7: Local Environment Construction & Runtime Preparation
 **Goal**: The new CLI can build or reuse the local bootstrap artifacts and runtime state needed for a gateway-backed Claude Code session.
@@ -85,7 +88,7 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. TS Backend Capability Inventory | 2/2 | Complete | 2026-04-08 |
-| 6. Standalone CLI Scaffold & Credential Discovery | 0/TBD | Not started | - |
+| 6. Standalone CLI Scaffold & Credential Discovery | 0/2 | Planned | - |
 | 7. Local Environment Construction & Runtime Preparation | 0/TBD | Not started | - |
 | 8. Claude Launch Handoff | 0/TBD | Not started | - |
 | 9. Validation & Operator Guidance | 0/TBD | Not started | - |
