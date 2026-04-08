@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 5: TS Backend Capability Inventory** - Inventory the TypeScript backend feature surface and lock the boundary for the new standalone CLI.
 - [x] **Phase 6: Standalone CLI Scaffold & Credential Discovery** - Create an isolated CLI entrypoint and detect supported local Claude credential sources safely.
-- [ ] **Phase 7: Local Environment Construction & Runtime Preparation** - Build or reuse bootstrap artifacts and prepare the runtime state required before launch.
+- [x] **Phase 7: Local Environment Construction & Runtime Preparation** - Build or reuse bootstrap artifacts and prepare the runtime state required before launch.
 - [ ] **Phase 8: Claude Launch Handoff** - Launch the installed `claude` executable through the prepared environment with full argument passthrough and failure handling.
 - [ ] **Phase 9: Validation & Operator Guidance** - Add tests and operator documentation that make the new CLI repeatable and supportable.
 
@@ -60,7 +60,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 07-01-PLAN.md — Create the CLI-owned workspace, manifest, and deterministic bootstrap/config-render flow with rerun-safe idempotency.
-- [ ] 07-02-PLAN.md — Add proxy-aware, health-gated runtime preparation and expose the Phase 7 `prepare-runtime` CLI command without launching Claude.
+- [x] 07-02-PLAN.md — Add proxy-aware, health-gated runtime preparation and expose the Phase 7 `prepare-runtime` CLI command without launching Claude.
 
 ### Phase 8: Claude Launch Handoff
 **Goal**: The new CLI launches the locally installed `claude` executable through the prepared environment with transparent argument passthrough and clear failure handling.
@@ -92,6 +92,6 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 |-------|----------------|--------|-----------|
 | 5. TS Backend Capability Inventory | 2/2 | Complete | 2026-04-08 |
 | 6. Standalone CLI Scaffold & Credential Discovery | 2/2 | Complete | 2026-04-08 |
-| 7. Local Environment Construction & Runtime Preparation | 0/TBD | Not started | - |
+| 7. Local Environment Construction & Runtime Preparation | 2/2 | Complete | 2026-04-08 |
 | 8. Claude Launch Handoff | 0/TBD | Not started | - |
 | 9. Validation & Operator Guidance | 0/TBD | Not started | - |

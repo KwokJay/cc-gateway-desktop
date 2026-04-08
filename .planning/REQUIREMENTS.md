@@ -15,8 +15,8 @@
 - [x] **ENV-01**: Operator can run the new standalone CLI on a machine with an existing Claude Code login and have it detect usable local Claude OAuth credentials from supported local sources or receive an actionable failure message.
 - [x] **ENV-02**: New CLI can generate or reuse canonical identity, client token, and local config or workspace artifacts needed for a local Claude-through-gateway session without editing the existing TypeScript or Rust applications.
 - [x] **ENV-03**: Re-running the new CLI on the same machine is idempotent and does not duplicate or corrupt previously generated bootstrap artifacts.
-- [ ] **ENV-04**: New CLI honors local outbound proxy settings expressed through the existing `HTTPS_PROXY` / `HTTP_PROXY` style environment variables.
-- [ ] **ENV-05**: New CLI prepares or starts the local runtime state required by the generated environment before Claude Code launch begins.
+- [x] **ENV-04**: New CLI honors local outbound proxy settings expressed through the existing `HTTPS_PROXY` / `HTTP_PROXY` style environment variables.
+- [x] **ENV-05**: New CLI prepares or starts the local runtime state required by the generated environment before Claude Code launch begins.
 
 ### Claude Launch
 
@@ -60,8 +60,8 @@
 | ISO-02 | Phase 6 | Complete |
 | ENV-02 | Phase 7 | Complete |
 | ENV-03 | Phase 7 | Complete |
-| ENV-04 | Phase 7 | Pending |
-| ENV-05 | Phase 7 | Pending |
+| ENV-04 | Phase 7 | Complete |
+| ENV-05 | Phase 7 | Complete |
 | RUN-01 | Phase 8 | Pending |
 | RUN-02 | Phase 8 | Pending |
 | RUN-03 | Phase 8 | Pending |
