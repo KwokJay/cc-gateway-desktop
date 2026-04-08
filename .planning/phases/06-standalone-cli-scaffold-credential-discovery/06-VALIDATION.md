@@ -1,9 +1,9 @@
 ---
 phase: 6
 slug: standalone-cli-scaffold-credential-discovery
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-08
 ---
 
@@ -28,17 +28,17 @@ Phase 06 must prove two things together:
 |----------|-------|
 | **Framework** | Direct TypeScript test files executed with `tsx` plus `tsc` compile verification |
 | **Config file** | none — package-local TypeScript build and direct test entry files |
-| **Quick run command** | `npx tsx standalone-cli/tests/credential-discovery.test.ts` |
-| **Full suite command** | `npm test && npx tsx tests/config.test.ts && npm run build && npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/credential-discovery.test.ts` |
+| **Quick run command** | `npx tsx standalone-cli/tests/credential-discovery.test.ts && npx tsx standalone-cli/tests/cli-help.test.ts` |
+| **Full suite command** | `npm test && npx tsx tests/config.test.ts && npm run build && npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/credential-discovery.test.ts && npx tsx standalone-cli/tests/cli-help.test.ts` |
 | **Estimated runtime** | ~25 seconds |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `npx tsx standalone-cli/tests/credential-discovery.test.ts`
-- **After every plan wave:** Run `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/credential-discovery.test.ts`
-- **Before `/gsd-verify-work`:** `npm test && npx tsx tests/config.test.ts && npm run build && npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/credential-discovery.test.ts`
+- **After every task commit:** Run `npx tsx standalone-cli/tests/credential-discovery.test.ts && npx tsx standalone-cli/tests/cli-help.test.ts` when the task touches `standalone-cli/src/cli.ts` or `standalone-cli/src/output.ts`; otherwise run the credential-discovery test alone.
+- **After every plan wave:** Run `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/credential-discovery.test.ts && npx tsx standalone-cli/tests/cli-help.test.ts`
+- **Before `/gsd-verify-work`:** `npm test && npx tsx tests/config.test.ts && npm run build && npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/credential-discovery.test.ts && npx tsx standalone-cli/tests/cli-help.test.ts`
 - **Max feedback latency:** 25 seconds
 
 ---
@@ -50,7 +50,7 @@ Phase 06 must prove two things together:
 | 06-01-01 | 01 | 1 | ISO-02 | T-06-01 | Isolated package scaffold exists outside protected legacy paths | build + file-contract | `test -f standalone-cli/package.json && test -f standalone-cli/tsconfig.json && test -f standalone-cli/src/index.ts && npm --prefix standalone-cli run build` | ❌ W0 | ⬜ pending |
 | 06-01-02 | 01 | 1 | ISO-02 | T-06-02 | Additive docs and help text state the new CLI does not replace legacy TS/Rust surfaces | doc/help check | `npx tsx standalone-cli/tests/cli-help.test.ts` | ❌ W0 | ⬜ pending |
 | 06-02-01 | 02 | 2 | ENV-01 | T-06-03 | Credential discovery checks macOS Keychain first, then `~/.claude/.credentials.json`, with actionable failures | unit | `npx tsx standalone-cli/tests/credential-discovery.test.ts` | ❌ W0 | ⬜ pending |
-| 06-02-02 | 02 | 2 | ENV-01 | T-06-04 | No live secrets are required for core verification; malformed JSON is distinct from “not found” | unit | `npx tsx standalone-cli/tests/credential-discovery.test.ts` | ❌ W0 | ⬜ pending |
+| 06-02-02 | 02 | 2 | ENV-01 | T-06-04 | No live secrets are required for core verification; malformed JSON is distinct from “not found”, and the additive help contract still holds after command wiring | unit + regression | `npx tsx standalone-cli/tests/credential-discovery.test.ts && npx tsx standalone-cli/tests/cli-help.test.ts` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -75,11 +75,11 @@ Phase 06 must prove two things together:
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 25s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 25s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-04-08
