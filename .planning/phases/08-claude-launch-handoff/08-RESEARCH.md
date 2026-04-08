@@ -320,17 +320,15 @@ Source: both legacy launcher surfaces set these exact keys. [VERIFIED: scripts/a
 | A3 | Symlink-aware checks should use `realpath()` or equivalent ownership validation before Phase 8 launch depends on workspace files. [ASSUMED] | Don't Hand-Roll, Common Pitfalls | Medium: without a concrete mitigation, the planner may miss the prerequisite hardening task. |
 | A4 | Stale-PID handling should verify runtime ownership before signaling or adopt another safer restart strategy. [ASSUMED] | Common Pitfalls, Security Domain | Medium: if left unaddressed, automatic launch could inherit a dangerous restart path. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `ccgw-standalone-cli` with no args launch interactive Claude or still print help?** [VERIFIED: standalone-cli/src/cli.ts]  
    What we know: current no-arg behavior is help, but `RUN-03` asks for transparent Claude arg passthrough and the legacy launcher uses bare invocation for interactive launch. [VERIFIED: standalone-cli/src/cli.ts, scripts/add-client.sh, .planning/REQUIREMENTS.md]  
-   What's unclear: no Phase 8 context file locks the UX. [VERIFIED: init phase-op output]  
-   Recommendation: decide this in the Phase 8 plan up front; the leanest operator UX is bare invocation for launch and explicit subcommands only for help or readiness-only operations. [ASSUMED]
+   Resolution: Phase 8 should make bare invocation perform the prepare-and-launch path so interactive Claude use matches the legacy launcher ergonomics, while explicit subcommands remain available for help and preparatory operations. [ASSUMED]
 
 2. **Should the four prerequisite hardening items be part of Phase 8 Wave 0 or split into a new inserted phase?** [VERIFIED: user request]  
    What we know: the user explicitly asked Phase 8 research to account for them as planning inputs before safe launch work. [VERIFIED: user request]  
-   What's unclear: whether the planner should sequence them inside Phase 8 or propose a decimal insertion.  
-   Recommendation: keep them inside Phase 8 as Wave 0 unless the hardening diff becomes large enough to deserve its own verification artifact. [ASSUMED]
+   Resolution: keep the hardening items inside Phase 8 as Wave 0 so launch handoff can build on a corrected runtime-prep substrate without creating another inserted phase unless execution complexity later proves that split necessary. [ASSUMED]
 
 ## Environment Availability
 
