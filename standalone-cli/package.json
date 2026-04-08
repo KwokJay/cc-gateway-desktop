@@ -1,0 +1,15 @@
+{
+  "name": "ccgw-standalone-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Additive standalone CLI scaffold for CC Gateway bootstrap work",
+  "bin": {
+    "ccgw-standalone-cli": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test:help": "tsx tests/cli-help.test.ts",
+    "test:credentials": "tsx tests/credential-discovery.test.ts"
+  }
+}
