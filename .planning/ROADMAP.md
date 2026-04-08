@@ -96,5 +96,5 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 | 5. TS Backend Capability Inventory | 2/2 | Complete | 2026-04-08 |
 | 6. Standalone CLI Scaffold & Credential Discovery | 2/2 | Complete | 2026-04-08 |
 | 7. Local Environment Construction & Runtime Preparation | 2/2 | Complete | 2026-04-08 |
-| 8. Claude Launch Handoff | 0/TBD | Not started | - |
+| 8. Claude Launch Handoff | 2/2 | Complete | 2026-04-08 |
 | 9. Validation & Operator Guidance | 0/TBD | Not started | - |

@@ -24,12 +24,13 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 - ✓ Detect supported local Claude credential sources in deterministic order with typed parse failures and secret-safe output — validated in Phase 6 via `standalone-cli/src/credential-discovery/*` and `.planning/phases/06-standalone-cli-scaffold-credential-discovery/VERIFICATION.md`
 - ✓ Generate or reuse a standalone CLI-owned bootstrap workspace, manifest, and legacy-compatible config without repo-root side effects — validated in Phase 7 via `standalone-cli/src/environment/bootstrap.ts` and `.planning/phases/07-local-environment-construction-runtime-preparation/VERIFICATION.md`
 - ✓ Prepare a proxy-aware, health-gated local runtime before any Claude launch handoff — validated in Phase 7 via `standalone-cli/src/environment/proxy-env.ts`, `runtime.ts`, `prepare.ts`, and `.planning/phases/07-local-environment-construction-runtime-preparation/VERIFICATION.md`
+- ✓ Launch the locally installed `claude` executable through the prepared gateway environment with exact env injection, unchanged arg passthrough, and actionable missing-command guidance — validated in Phase 8 via `standalone-cli/src/launch/claude.ts` and `.planning/phases/08-claude-launch-handoff/VERIFICATION.md`
 
 ### Active
 
-- Launch the locally installed `claude` executable automatically after bootstrap succeeds, with the required gateway-oriented environment variables
 - Keep the existing TypeScript gateway, Rust daemon, Rust CLI, and desktop app unchanged while the new CLI is developed in an isolated path
 - Add verification and operator guidance for first-run bootstrap, repeat-run idempotency, and launch failure handling
+- Close the remaining validation and operator-guidance gaps for the standalone CLI before milestone completion
 
 ### Out of Scope
 
@@ -73,6 +74,7 @@ Operators can run Claude Code through one trusted gateway that presents a stable
 | Keep credential discovery deterministic and secret-safe                                        | Phase 6 validated Keychain-first/file-fallback detection with typed parse failures and no raw token output                                                     | ✓ Good     |
 | Use a CLI-owned workspace and manifest as the durable bootstrap source of truth               | Phase 7 validated idempotent reruns and legacy-compatible config rendering without recreating repo-root shell side effects                                     | ✓ Good     |
 | Gate runtime readiness on `/_health` instead of process spawn alone                           | Phase 7 validated that launch handoff should only happen after a proxy-aware healthy runtime is available                                                      | ✓ Good     |
+| Use direct child-process launch with exact env injection and no shell wrapper                 | Phase 8 validated safer argv passthrough and actionable missing-command handling while preserving the standalone package boundary                               | ✓ Good     |
 
 
 ## Current Milestone: v1.1 Standalone Claude Bootstrap CLI
@@ -107,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-08 after Phase 7 completion*
+*Last updated: 2026-04-08 after Phase 8 completion*
