@@ -1,14 +1,21 @@
 import { strict as assert } from 'assert'
 import { readFileSync } from 'fs'
 
-import { discoverCredentials } from '../src/credential-discovery/discover.js'
-import { parseCredentialPayload } from '../src/credential-discovery/parse.js'
-import { renderDiscoveryFailure, renderDiscoverySuccess } from '../src/output.js'
-import type { DiscoveryFailure, DiscoverySource } from '../src/credential-discovery/types.js'
+type DiscoverySource = 'macos-keychain' | 'credentials-file'
+type DiscoveryFailure = {
+  ok: false
+  source: DiscoverySource
+  reason: 'not-available' | 'not-found' | 'parse-error' | 'invalid-credentials'
+  detail: string
+}
 
 function readFixture(name: string): string {
   return readFileSync(new URL(`./fixtures/credential-discovery/${name}`, import.meta.url), 'utf8')
 }
+
+const { discoverCredentials } = await import(new URL('../src/credential-discovery/discover.ts', import.meta.url).href)
+const { parseCredentialPayload } = await import(new URL('../src/credential-discovery/parse.ts', import.meta.url).href)
+const { renderDiscoveryFailure, renderDiscoverySuccess } = await import(new URL('../src/output.ts', import.meta.url).href)
 
 function notFound(source: DiscoverySource, detail: string): DiscoveryFailure {
   return {

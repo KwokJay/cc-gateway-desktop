@@ -1,13 +1,13 @@
 import { strict as assert } from 'assert'
 
-import { runCli } from '../src/cli.js'
-import { renderHelpText } from '../src/output.js'
-
 type CapturedRun = {
   exitCode: number
   stderr: string
   stdout: string
 }
+
+const { runCli } = await import(new URL('../src/cli.ts', import.meta.url).href)
+const { renderHelpText } = await import(new URL('../src/output.ts', import.meta.url).href)
 
 async function captureRun(argv: string[]): Promise<CapturedRun> {
   const originalStdoutWrite = process.stdout.write.bind(process.stdout)
