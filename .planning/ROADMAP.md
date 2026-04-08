@@ -45,7 +45,7 @@ Plans:
   3. Operators can tell from the code and docs that the new CLI is additive and does not replace the existing TypeScript gateway or Rust products.
 **Plans**: 2 plans
 Plans:
-- [ ] 06-01-PLAN.md — Create the isolated `standalone-cli/` package scaffold, shared contracts, and additive operator help/docs surface.
+- [x] 06-01-PLAN.md — Create the isolated `standalone-cli/` package scaffold, shared contracts, and additive operator help/docs surface.
 - [ ] 06-02-PLAN.md — Implement deterministic credential discovery, typed parse/error handling, and fixture-driven verification inside the isolated package.
 
 ### Phase 7: Local Environment Construction & Runtime Preparation
