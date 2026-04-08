@@ -32,7 +32,7 @@ Phase 07 must prove four things together:
 | **Config file** | none — package-local TypeScript build and direct `tsx` tests |
 | **Quick run command** | `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/environment-bootstrap.test.ts` |
 | **Full suite command** | `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/cli-help.test.ts && npx tsx standalone-cli/tests/credential-discovery.test.ts && npx tsx standalone-cli/tests/environment-bootstrap.test.ts && npx tsx standalone-cli/tests/proxy-env.test.ts && npx tsx standalone-cli/tests/runtime-preparation.test.ts` |
-| **Estimated runtime** | ~35 seconds |
+| **Estimated runtime** | ~30 seconds |
 
 ---
 
@@ -41,7 +41,7 @@ Phase 07 must prove four things together:
 - **After every task commit:** Run the targeted new Phase 7 test plus `npm --prefix standalone-cli run build`
 - **After every plan wave:** Run the full standalone CLI suite for Phase 7
 - **Before `/gsd-verify-work`:** `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/cli-help.test.ts && npx tsx standalone-cli/tests/credential-discovery.test.ts && npx tsx standalone-cli/tests/environment-bootstrap.test.ts && npx tsx standalone-cli/tests/proxy-env.test.ts && npx tsx standalone-cli/tests/runtime-preparation.test.ts`
-- **Max feedback latency:** 35 seconds
+- **Max feedback latency:** 30 seconds
 
 ---
 
@@ -82,7 +82,7 @@ Phase 07 must prove four things together:
 - [ ] Sampling continuity: no 3 consecutive tasks without automated verify
 - [ ] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
-- [ ] Feedback latency < 35s
+- [ ] Feedback latency < 30s
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
