@@ -57,7 +57,10 @@ Plans:
   2. A repeat run safely reuses or refreshes bootstrap artifacts instead of duplicating or corrupting them.
   3. Proxy-aware settings from the local environment are preserved when the bootstrap flow prepares outbound access.
   4. The runtime state required for the generated environment is prepared before Claude launch begins.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 07-01-PLAN.md — Create the CLI-owned workspace, manifest, and deterministic bootstrap/config-render flow with rerun-safe idempotency.
+- [ ] 07-02-PLAN.md — Add proxy-aware, health-gated runtime preparation and expose the Phase 7 `prepare-runtime` CLI command without launching Claude.
 
 ### Phase 8: Claude Launch Handoff
 **Goal**: The new CLI launches the locally installed `claude` executable through the prepared environment with transparent argument passthrough and clear failure handling.
