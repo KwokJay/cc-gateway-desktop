@@ -30,7 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. The TypeScript backend's runtime, setup, auth, config, and launch capabilities are documented from source files and scripts rather than assumed.
   2. Each analyzed capability is classified as must-port, reference-only, or deferred for the new CLI milestone.
   3. The milestone records an explicit boundary stating that existing TypeScript and Rust program paths remain unchanged while the new CLI is developed.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 05-01-PLAN.md — Create the source-cited TypeScript backend capability inventory and classification matrix.
+- [ ] 05-02-PLAN.md — Write the explicit isolation boundary and refresh the phase validation guardrails for ISO-01.
 
 ### Phase 6: Standalone CLI Scaffold & Credential Discovery
 **Goal**: An isolated new CLI surface exists and can detect supported local Claude credential sources without confusing operators or mutating legacy codepaths.
@@ -81,7 +84,7 @@ Phases execute in numeric order: 5 → 6 → 7 → 8 → 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. TS Backend Capability Inventory | 0/TBD | Not started | - |
+| 5. TS Backend Capability Inventory | 0/2 | Not started | - |
 | 6. Standalone CLI Scaffold & Credential Discovery | 0/TBD | Not started | - |
 | 7. Local Environment Construction & Runtime Preparation | 0/TBD | Not started | - |
 | 8. Claude Launch Handoff | 0/TBD | Not started | - |
