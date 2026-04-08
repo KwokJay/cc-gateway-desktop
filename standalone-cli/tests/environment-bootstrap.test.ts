@@ -1,11 +1,14 @@
 import { strict as assert } from 'assert'
+import { mkdir, symlink } from 'fs/promises'
 import { join } from 'path'
 import { parse } from 'yaml'
 
 import { withTempWorkspace } from './helpers/temp-workspace.ts'
 
 const { bootstrapEnvironment } = await import(new URL('../src/environment/bootstrap.ts', import.meta.url).href)
-const { resolveWorkspacePaths } = await import(new URL('../src/environment/workspace.ts', import.meta.url).href)
+const { assertWorkspacePath, resolveWorkspacePaths } = await import(
+  new URL('../src/environment/workspace.ts', import.meta.url).href
+)
 
 type DiscoveryCredentials = {
   accessToken?: string
@@ -154,6 +157,32 @@ function fixtureCredentials(overrides: Partial<DiscoveryCredentials> = {}): Disc
     assert.equal(config.identity.device_id, firstManifest.identity.deviceId)
     assert.equal(config.identity.email, firstManifest.identity.email)
     assert.equal(config.auth.tokens.length, 1, 'rerender must not duplicate auth token entries when oauth changes')
+  })
+}
+
+{
+  await withTempWorkspace(async (workspace) => {
+    const outsideRoot = join(workspace.rootDir, 'symlink-escape-target')
+    const ccgwRoot = join(workspace.fakeHomeDir, '.ccgw')
+    const symlinkedWorkspaceRoot = join(ccgwRoot, 'standalone-cli')
+
+    await mkdir(outsideRoot, { recursive: true })
+    await mkdir(ccgwRoot, { recursive: true })
+    await symlink(outsideRoot, symlinkedWorkspaceRoot, 'dir')
+
+    const paths = resolveWorkspacePaths({ homeDir: workspace.fakeHomeDir })
+
+    for (const [label, targetPath] of [
+      ['manifestPath symlink', paths.manifestPath],
+      ['configPath symlink', paths.configPath],
+      ['runtime.json symlink', paths.runtimePath],
+    ] as const) {
+      assert.throws(
+        () => assertWorkspacePath(paths, targetPath, label),
+        /inside|standalone-cli|workspace/i,
+        `${label} must reject symlink escapes even when the path string appears inside ~/.ccgw/standalone-cli`,
+      )
+    }
   })
 }
 

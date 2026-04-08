@@ -1,11 +1,16 @@
 import { strict as assert } from 'assert'
-import { writeFile } from 'fs/promises'
+import { mkdir, writeFile } from 'fs/promises'
+import { createServer } from 'http'
+import { dirname, join, resolve } from 'path'
+import { fileURLToPath } from 'url'
 
 import { withTempWorkspace } from './helpers/temp-workspace.ts'
 
 const { bootstrapEnvironment } = await import(new URL('../src/environment/bootstrap.ts', import.meta.url).href)
 const { prepareRuntimeEnvironment } = await import(new URL('../src/environment/prepare.ts', import.meta.url).href)
 const { runCli } = await import(new URL('../src/cli.ts', import.meta.url).href)
+
+const REAL_REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 type DiscoveryCredentials = {
   accessToken?: string
@@ -25,6 +30,7 @@ type BootstrapManifest = {
     pid?: number
     healthUrl?: string
     configFingerprint?: string
+    ownershipToken?: string
   }
 }
 
@@ -117,6 +123,17 @@ function createRuntimeHarness(options: RuntimeHarnessOptions = {}): RuntimeHarne
 
 async function persistManifest(path: string, manifest: BootstrapManifest): Promise<void> {
   await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+}
+
+async function persistRuntimeOwnership(
+  path: string,
+  ownership: {
+    pid: number
+    configFingerprint: string
+    ownershipToken: string
+  },
+): Promise<void> {
+  await writeFile(path, `${JSON.stringify(ownership, null, 2)}\n`, 'utf8')
 }
 
 async function captureRun(
@@ -230,11 +247,15 @@ async function captureRun(
 
 {
   await withTempWorkspace(async (workspace) => {
+    const callerCwd = join(workspace.rootDir, 'non-repo-caller-cwd')
     const harness = createRuntimeHarness({ buildExists: false })
+
+    await mkdir(callerCwd, { recursive: true })
+    await writeFile(join(callerCwd, '.keep'), 'repo root marker\n', 'utf8')
 
     const result = await prepareRuntimeEnvironment(fixtureCredentials(), {
       homeDir: workspace.fakeHomeDir,
-      cwd: workspace.repoRoot,
+      cwd: callerCwd,
       now: () => '2026-04-08T00:05:00.000Z',
       runtime: harness.adapters,
     })
@@ -244,39 +265,125 @@ async function captureRun(
       {
         command: 'npm',
         args: ['run', 'build'],
-        cwd: workspace.repoRoot,
+        cwd: REAL_REPO_ROOT,
       },
     ])
     assert.equal(harness.spawnCalls.length, 1)
+    assert.equal(
+      harness.spawnCalls[0]?.cwd,
+      REAL_REPO_ROOT,
+      'repo root resolution must ignore caller cwd and spawn from the standalone-cli repo root',
+    )
     assert.deepEqual(harness.spawnCalls[0]?.args, ['dist/index.js', result.bootstrap.configPath])
   })
 }
 
 {
   await withTempWorkspace(async (workspace) => {
-    const harness = createRuntimeHarness({
-      healthResults: [
-        { ok: false, status: 503, detail: 'oauth not ready' },
-        { ok: false, status: 503, detail: 'oauth not ready' },
-        { ok: false, status: 503, detail: 'oauth not ready' },
-      ],
+    const bootstrap = await bootstrapEnvironment(fixtureCredentials(), {
+      homeDir: workspace.fakeHomeDir,
+      cwd: workspace.repoRoot,
+      now: () => '2026-04-08T00:00:00.000Z',
+    })
+    const manifest = await workspace.readJson<BootstrapManifest>(bootstrap.manifestPath)
+    const hangingServer = createServer((_req, _res) => {
+      // Intentionally leave the response open so each /_health request needs a timeout or abort path.
+    })
+    await new Promise<void>((resolveListen, rejectListen) => {
+      hangingServer.once('error', rejectListen)
+      hangingServer.listen(0, '127.0.0.1', () => resolveListen())
     })
 
-    await assert.rejects(
-      prepareRuntimeEnvironment(fixtureCredentials(), {
-        homeDir: workspace.fakeHomeDir,
-        cwd: workspace.repoRoot,
-        now: () => '2026-04-08T00:05:00.000Z',
-        runtime: harness.adapters,
-        timeoutMs: 10,
-        pollIntervalMs: 1,
-      }),
-      /_health|timed out|oauth not ready/i,
-      'runtime preparation must fail fast with actionable readiness detail when /_health never becomes ready',
-    )
+    const address = hangingServer.address()
+    assert.ok(address && typeof address === 'object' && 'port' in address, 'timeout test requires a local /_health port')
+
+    manifest.runtime = {
+      port: address.port,
+      healthUrl: `http://127.0.0.1:${address.port}/_health`,
+    }
+    await persistManifest(bootstrap.manifestPath, manifest)
+
+    const harness = createRuntimeHarness({ buildExists: true })
+
+    try {
+      await assert.rejects(
+        Promise.race([
+          prepareRuntimeEnvironment(fixtureCredentials(), {
+            homeDir: workspace.fakeHomeDir,
+            cwd: workspace.repoRoot,
+            now: () => '2026-04-08T00:05:00.000Z',
+            runtime: {
+              fileExists: harness.adapters.fileExists,
+              buildGateway: harness.adapters.buildGateway,
+              spawnGateway: harness.adapters.spawnGateway,
+              sleep: harness.adapters.sleep,
+              stopRuntime: harness.adapters.stopRuntime,
+            },
+            timeoutMs: 80,
+            pollIntervalMs: 5,
+          }),
+          new Promise((_, rejectPromise) => {
+            setTimeout(() => rejectPromise(new Error('health timeout sentinel exceeded before per-request timeout fired')), 500)
+          }),
+        ]),
+        /_health|timeout|timed out|abort/i,
+        'runtime preparation must surface a per-request timeout for each hung /_health probe instead of waiting indefinitely',
+      )
+    } finally {
+      await new Promise<void>((resolveClose, rejectClose) => {
+        hangingServer.close((error) => {
+          if (error) {
+            rejectClose(error)
+            return
+          }
+
+          resolveClose()
+        })
+      })
+    }
 
     assert.equal(harness.spawnCalls.length, 1)
-    assert.ok(harness.healthChecks.length >= 1, 'runtime preparation must poll /_health instead of reporting success after spawn')
+  })
+}
+
+{
+  await withTempWorkspace(async (workspace) => {
+    const bootstrap = await bootstrapEnvironment(fixtureCredentials(), {
+      homeDir: workspace.fakeHomeDir,
+      cwd: workspace.repoRoot,
+      now: () => '2026-04-08T00:00:00.000Z',
+    })
+    const manifest = await workspace.readJson<BootstrapManifest>(bootstrap.manifestPath)
+    const harness = createRuntimeHarness()
+
+    manifest.runtime = {
+      port: 8443,
+      pid: 654,
+      healthUrl: 'http://127.0.0.1:8443/_health',
+      configFingerprint: 'stale-fingerprint',
+      ownershipToken: 'manifest-owned-pid',
+    }
+    await persistManifest(bootstrap.manifestPath, manifest)
+    await persistRuntimeOwnership(bootstrap.workspacePaths.runtimePath, {
+      pid: 999999,
+      configFingerprint: 'other-runtime',
+      ownershipToken: 'different-runtime.json-owner',
+    })
+
+    const result = await prepareRuntimeEnvironment(fixtureCredentials(), {
+      homeDir: workspace.fakeHomeDir,
+      cwd: workspace.repoRoot,
+      now: () => '2026-04-08T00:05:00.000Z',
+      runtime: harness.adapters,
+    })
+
+    assert.equal(result.runtime.action, 'restarted')
+    assert.deepEqual(
+      harness.killCalls,
+      [],
+      'pid shutdown must require matching runtime.json ownership evidence instead of blindly stopping a stale manifest pid',
+    )
+    assert.equal(harness.spawnCalls.length, 1, 'mismatched runtime.json ownership should clear stale state and start fresh')
   })
 }
 
