@@ -73,7 +73,7 @@ Plans:
   4. Missing-`claude` or launch-execution failures stop the flow with actionable install or PATH guidance.
 **Plans**: 2 plans
 Plans:
-- [ ] 08-01-PLAN.md — Harden the Phase 7 runtime-prep substrate for stable repo-root, timeout, PID-ownership, and symlink-safe launch prerequisites.
+- [x] 08-01-PLAN.md — Harden the Phase 7 runtime-prep substrate for stable repo-root, timeout, PID-ownership, and symlink-safe launch prerequisites.
 - [ ] 08-02-PLAN.md — Add direct Claude handoff with exact env injection, unchanged arg passthrough, and actionable missing-command guidance.
 
 ### Phase 9: Validation & Operator Guidance

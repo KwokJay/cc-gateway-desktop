@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: ready
-stopped_at: Phase 07 complete and ready to plan Phase 08.
-last_updated: "2026-04-08T07:30:12.473Z"
-last_activity: 2026-04-08 -- Phase 08 planning complete
+status: executing
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-04-08T07:50:12.220Z"
+last_activity: 2026-04-08
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 8
-  completed_plans: 6
-  percent: 75
+  completed_plans: 7
+  percent: 88
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Operators can run Claude Code through one trusted gateway that presents a stable canonical identity and does not leak surprising telemetry or operational state.
-**Current focus:** Phase 8 - Claude Launch Handoff
+**Current focus:** Phase 08 — Claude Launch Handoff
 
 ## Current Position
 
-Phase: 8 of 9 (Claude Launch Handoff)
-Plan: 2 of 2 in current phase
+Phase: 08 (Claude Launch Handoff) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-04-08 -- Phase 08 planning complete
+Last activity: 2026-04-08
 
 Progress: [██████░░░░] 60%
 
@@ -53,6 +53,8 @@ Progress: [██████░░░░] 60%
 - Last 5 plans: 05-02 (2 min), 06-01 (4 min), 06-02 (5 min), 07-01 (7 min), 07-02 (6 min)
 - Trend: Stable
 
+| Phase 08 P01 | 10min | 2 tasks | 7 files |
+
 ## Accumulated Context
 
 ### Decisions
@@ -75,6 +77,9 @@ Recent decisions affecting current work:
 - [Phase 07-local-environment-construction-runtime-preparation]: Use a JSON manifest as the durable source of truth, then rerender config.yaml fully on each bootstrap run.
 - [Phase 07-local-environment-construction-runtime-preparation]: Refresh only OAuth values on rerun while keeping local client auth and canonical identity stable.
 - [Phase 07-local-environment-construction-runtime-preparation]: Reuse the existing runtime only when the stored config fingerprint matches the current rendered config and /_health is already healthy.
+- [Phase 08]: Resolve the gateway repo root from the standalone package location instead of caller cwd so launch prep cannot be redirected by invocation context.
+- [Phase 08]: Persist runtime ownership in runtime.json and require it to match manifest state before stopping a stale PID.
+- [Phase 08]: Bound each health probe separately so one hung request cannot silently consume the entire readiness budget.
 
 ### Pending Todos
 
@@ -88,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08
-Stopped at: Phase 07 complete and ready to plan Phase 08.
+Last session: 2026-04-08T07:50:12.217Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None
