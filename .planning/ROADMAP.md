@@ -71,7 +71,10 @@ Plans:
   2. The launched process receives the required gateway-oriented environment variables without manual operator setup.
   3. Arbitrary Claude CLI arguments pass through the new CLI unchanged.
   4. Missing-`claude` or launch-execution failures stop the flow with actionable install or PATH guidance.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 08-01-PLAN.md — Harden the Phase 7 runtime-prep substrate for stable repo-root, timeout, PID-ownership, and symlink-safe launch prerequisites.
+- [ ] 08-02-PLAN.md — Add direct Claude handoff with exact env injection, unchanged arg passthrough, and actionable missing-command guidance.
 
 ### Phase 9: Validation & Operator Guidance
 **Goal**: The new CLI is backed by automated checks and operator docs that prove first-run, repeat-run, and failure-recovery behavior.

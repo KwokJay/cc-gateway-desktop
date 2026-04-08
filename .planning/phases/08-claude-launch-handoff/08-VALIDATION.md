@@ -2,8 +2,8 @@
 phase: 8
 slug: claude-launch-handoff
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-08
 ---
 
@@ -50,20 +50,20 @@ Phase 08 must prove five things together:
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 08-01-01 | 01 | 1 | RUN-04 | T-08-01 | Runtime-prep hardening prevents wrong-repo launch, hung health checks, stale PID kills, and workspace escape before launch starts | integration | `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/runtime-preparation.test.ts` | ❌ W0 | ⬜ pending |
-| 08-01-02 | 01 | 1 | RUN-01 | T-08-02 | CLI can locate `claude` or emit actionable install/PATH guidance | unit | `npx tsx standalone-cli/tests/claude-launch.test.ts` | ❌ W0 | ⬜ pending |
-| 08-02-01 | 02 | 2 | RUN-02 | T-08-03 | Launch env injects `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, and `CLAUDE_CODE_ATTRIBUTION_HEADER=false` without leaking raw values | unit | `npx tsx standalone-cli/tests/claude-launch.test.ts` | ❌ W0 | ⬜ pending |
-| 08-02-02 | 02 | 2 | RUN-03 | T-08-04 | Bare invocation and explicit launch paths pass arbitrary Claude args through unchanged while preserving additive help behavior | integration | `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/cli-help.test.ts && npx tsx standalone-cli/tests/claude-launch.test.ts` | ❌ W0 | ⬜ pending |
+| 08-01-01 | 01 | 1 | RUN-04 | T-08-01 | Runtime-prep hardening prevents wrong-repo launch, hung health checks, stale PID kills, and workspace escape before launch starts | integration | `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/runtime-preparation.test.ts` | ✅ planned in 08-01 | ⬜ pending |
+| 08-01-02 | 01 | 1 | RUN-01 | T-08-02 | CLI can locate `claude` or emit actionable install/PATH guidance | unit | `npx tsx standalone-cli/tests/claude-launch.test.ts` | ✅ planned in 08-02 | ⬜ pending |
+| 08-02-01 | 02 | 2 | RUN-02 | T-08-03 | Launch env injects `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, and `CLAUDE_CODE_ATTRIBUTION_HEADER=false` without leaking raw values | unit | `npx tsx standalone-cli/tests/claude-launch.test.ts` | ✅ planned in 08-02 | ⬜ pending |
+| 08-02-02 | 02 | 2 | RUN-03 | T-08-04 | Bare invocation and explicit launch paths pass arbitrary Claude args through unchanged while preserving additive help behavior | integration | `npm --prefix standalone-cli run build && npx tsx standalone-cli/tests/cli-help.test.ts && npx tsx standalone-cli/tests/claude-launch.test.ts` | ✅ planned in 08-02 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
-## Wave 0 Requirements
+## Planned Test Surface
 
-- [ ] `standalone-cli/tests/claude-launch.test.ts` — covers executable resolution, env injection, arg passthrough, and missing-`claude` failures
-- [ ] `standalone-cli/tests/helpers/launch-spy.ts` or equivalent — captures spawn args/env without launching a real `claude` process
-- [ ] Phase 7 runtime-prep tests extended for repo-root resolution, request timeout, PID ownership, and symlink-aware workspace checks
+- `standalone-cli/tests/claude-launch.test.ts` — created in Plan `08-02` Task 1 for executable resolution, env injection, arg passthrough, and missing-`claude` failures
+- `standalone-cli/tests/helpers/launch-spy.ts` or equivalent — created in Plan `08-02` Task 1 to capture spawn args/env without launching a real `claude` process
+- Phase 7 runtime-prep tests extended in Plan `08-01` Task 1 for repo-root resolution, request timeout, PID ownership, and symlink-aware workspace checks
 
 ---
 
@@ -80,7 +80,7 @@ Phase 08 must prove five things together:
 
 - [ ] All tasks have `<automated>` verify or Wave 0 dependencies
 - [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
+- [x] Wave 0 covers all MISSING references via explicit Task 1 red-side test authoring in Plans `08-01` and `08-02`
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 30s
 - [ ] `nyquist_compliant: true` set in frontmatter
