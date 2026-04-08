@@ -216,8 +216,14 @@ async function captureRun(
       pid: 654,
       healthUrl: 'http://127.0.0.1:8443/_health',
       configFingerprint: 'stale-fingerprint',
+      ownershipToken: 'owned-runtime-pid',
     }
     await persistManifest(bootstrap.manifestPath, manifest)
+    await persistRuntimeOwnership(bootstrap.workspacePaths.runtimePath, {
+      pid: 654,
+      configFingerprint: 'stale-fingerprint',
+      ownershipToken: 'owned-runtime-pid',
+    })
 
     const result = await prepareRuntimeEnvironment(fixtureCredentials(), {
       homeDir: workspace.fakeHomeDir,
@@ -235,7 +241,7 @@ async function captureRun(
     assert.equal(harness.spawnCalls.length, 1, 'stale runtime metadata must force a fresh process')
     assert.equal(harness.spawnCalls[0]?.command, 'node')
     assert.deepEqual(harness.spawnCalls[0]?.args, ['dist/index.js', bootstrap.configPath])
-    assert.equal(harness.spawnCalls[0]?.cwd, workspace.repoRoot)
+    assert.equal(harness.spawnCalls[0]?.cwd, REAL_REPO_ROOT)
     assert.equal(
       harness.spawnCalls[0]?.env.HTTPS_PROXY,
       'http://proxy.example.test:8443',

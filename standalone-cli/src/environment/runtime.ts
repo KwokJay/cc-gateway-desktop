@@ -1,15 +1,20 @@
+import { randomUUID } from 'crypto'
 import { spawn } from 'child_process'
 import { access } from 'fs/promises'
 import { request } from 'http'
-import { resolve } from 'path'
+import { dirname, resolve } from 'path'
+import { fileURLToPath } from 'url'
 
 import type { BootstrapManifest, RuntimePreparationSummary } from './types.js'
+import { readRuntimeOwnership } from './manifest.js'
 import { resolveProxyEnvironment } from './proxy-env.js'
 
 const DEFAULT_RUNTIME_PORT = 8443
 const DEFAULT_TIMEOUT_MS = 15000
 const DEFAULT_POLL_INTERVAL_MS = 250
+const DEFAULT_HEALTH_REQUEST_TIMEOUT_MS = 250
 const ENTRYPOINT_SEGMENTS = ['dist', 'index.js'] as const
+const REPO_ROOT_SEGMENTS = ['..', '..', '..'] as const
 
 export interface BuildGatewayInput {
   command: string
@@ -105,7 +110,11 @@ async function defaultSpawnGateway(input: SpawnGatewayInput): Promise<{ pid: num
 
 async function defaultCheckHealth(url: string): Promise<HealthCheckResult> {
   return new Promise((resolveHealth) => {
-    const req = request(url, { method: 'GET' }, (res) => {
+    const abortController = new AbortController()
+    const timeoutHandle = setTimeout(() => {
+      abortController.abort()
+    }, DEFAULT_HEALTH_REQUEST_TIMEOUT_MS)
+    const req = request(url, { method: 'GET', signal: abortController.signal }, (res) => {
       const chunks: Buffer[] = []
 
       res.on('data', (chunk) => {
@@ -113,6 +122,7 @@ async function defaultCheckHealth(url: string): Promise<HealthCheckResult> {
       })
 
       res.on('end', () => {
+        clearTimeout(timeoutHandle)
         const body = Buffer.concat(chunks).toString('utf8').trim()
 
         resolveHealth({
@@ -124,9 +134,13 @@ async function defaultCheckHealth(url: string): Promise<HealthCheckResult> {
     })
 
     req.once('error', (error) => {
+      clearTimeout(timeoutHandle)
       resolveHealth({
         ok: false,
-        detail: error.message,
+        detail:
+          'code' in error && error.code === 'ABORT_ERR'
+            ? `request timeout after ${DEFAULT_HEALTH_REQUEST_TIMEOUT_MS}ms`
+            : error.message,
       })
     })
     req.end()
@@ -158,6 +172,31 @@ function resolveSourceEnv(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return overrides ? { ...process.env, ...overrides } : process.env
 }
 
+function resolveRepoRoot(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), ...REPO_ROOT_SEGMENTS)
+}
+
+async function checkHealthWithinTimeout(
+  healthUrl: string,
+  adapters: RuntimeAdapters,
+  probeTimeoutMs: number,
+): Promise<HealthCheckResult> {
+  try {
+    return await Promise.race([
+      adapters.checkHealth(healthUrl),
+      delay(probeTimeoutMs).then<HealthCheckResult>(() => ({
+        ok: false,
+        detail: `request timeout after ${probeTimeoutMs}ms`,
+      })),
+    ])
+  } catch (error) {
+    return {
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
 async function waitForHealthyRuntime(
   healthUrl: string,
   adapters: RuntimeAdapters,
@@ -168,40 +207,71 @@ async function waitForHealthyRuntime(
   let lastDetail = 'runtime did not report healthy state'
 
   while (Date.now() < deadline) {
-    const health = await adapters.checkHealth(healthUrl)
+    const remainingMs = deadline - Date.now()
+    const probeTimeoutMs = Math.max(1, Math.min(DEFAULT_HEALTH_REQUEST_TIMEOUT_MS, remainingMs))
+    const health = await checkHealthWithinTimeout(healthUrl, adapters, probeTimeoutMs)
+
     if (health.ok) {
       return
     }
 
     lastDetail = health.detail ?? `status ${health.status ?? 'unknown'}`
+
+    if (Date.now() >= deadline) {
+      break
+    }
+
     await adapters.sleep(pollIntervalMs)
   }
 
   throw new Error(`Gateway readiness timed out while waiting for ${healthUrl}: ${lastDetail}`)
 }
 
+function canStopOwnedRuntime(
+  manifest: BootstrapManifest,
+  ownership: Awaited<ReturnType<typeof readRuntimeOwnership>>,
+): boolean {
+  const runtime = manifest.runtime
+
+  if (!runtime?.pid || !runtime.ownershipToken || !ownership) {
+    return false
+  }
+
+  return (
+    ownership.pid === runtime.pid &&
+    ownership.configFingerprint === runtime.configFingerprint &&
+    ownership.ownershipToken === runtime.ownershipToken
+  )
+}
+
 export async function ensureGatewayRuntime(
   manifest: BootstrapManifest,
   options: EnsureRuntimeOptions = {},
 ): Promise<RuntimePreparationSummary> {
-  const cwd = resolve(options.cwd ?? process.cwd())
+  const repoRoot = resolveRepoRoot()
   const adapters = resolveRuntimeAdapters(options.runtime)
   const sourceEnv = resolveSourceEnv(options.processEnv)
   const { proxyEnv } = resolveProxyEnvironment(sourceEnv)
-  const entrypointPath = resolve(cwd, ...ENTRYPOINT_SEGMENTS)
+  const entrypointPath = resolve(repoRoot, ...ENTRYPOINT_SEGMENTS)
   const port = manifest.runtime?.port ?? DEFAULT_RUNTIME_PORT
   const healthUrl = manifest.runtime?.healthUrl ?? `http://127.0.0.1:${port}/_health`
   const configFingerprint = manifest.generatedConfig.renderFingerprint
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
   const existingRuntime = manifest.runtime
+  const runtimeOwnership = await readRuntimeOwnership(manifest.paths)
 
   if (
     existingRuntime?.configFingerprint === configFingerprint &&
     existingRuntime.healthUrl &&
     existingRuntime.pid
   ) {
-    const health = await adapters.checkHealth(existingRuntime.healthUrl)
+    const health = await checkHealthWithinTimeout(
+      existingRuntime.healthUrl,
+      adapters,
+      Math.min(DEFAULT_HEALTH_REQUEST_TIMEOUT_MS, timeoutMs),
+    )
+
     if (health.ok) {
       return {
         action: 'reused',
@@ -210,12 +280,13 @@ export async function ensureGatewayRuntime(
         healthUrl: existingRuntime.healthUrl,
         configPath: manifest.generatedConfig.path,
         configFingerprint,
+        ownershipToken: existingRuntime.ownershipToken ?? runtimeOwnership?.ownershipToken ?? randomUUID(),
         builtGateway: false,
       }
     }
   }
 
-  if (existingRuntime?.pid) {
+  if (canStopOwnedRuntime(manifest, runtimeOwnership) && existingRuntime?.pid) {
     await adapters.stopRuntime(existingRuntime.pid)
   }
 
@@ -224,15 +295,16 @@ export async function ensureGatewayRuntime(
     await adapters.buildGateway({
       command: 'npm',
       args: ['run', 'build'],
-      cwd,
+      cwd: repoRoot,
     })
     builtGateway = true
   }
 
+  const ownershipToken = randomUUID()
   const runtimeProcess = await adapters.spawnGateway({
     command: 'node',
     args: ['dist/index.js', manifest.generatedConfig.path],
-    cwd,
+    cwd: repoRoot,
     env: {
       ...sourceEnv,
       ...proxyEnv,
@@ -253,6 +325,7 @@ export async function ensureGatewayRuntime(
     healthUrl,
     configPath: manifest.generatedConfig.path,
     configFingerprint,
+    ownershipToken,
     builtGateway,
   }
 }

@@ -1,6 +1,10 @@
 import type { DiscoveryCredentials } from '../credential-discovery/types.js'
 import { bootstrapEnvironment, type BootstrapOptions } from './bootstrap.js'
-import { readBootstrapManifest, writeBootstrapManifest } from './manifest.js'
+import {
+  readBootstrapManifest,
+  writeBootstrapManifest,
+  writeRuntimeOwnership,
+} from './manifest.js'
 import { ensureGatewayRuntime, type EnsureRuntimeOptions } from './runtime.js'
 import type { PreparedRuntimeSummary } from './types.js'
 import { resolveWorkspacePaths } from './workspace.js'
@@ -26,8 +30,14 @@ export async function prepareRuntimeEnvironment(
     pid: runtime.pid,
     healthUrl: runtime.healthUrl,
     configFingerprint: runtime.configFingerprint,
+    ownershipToken: runtime.ownershipToken,
   }
 
+  await writeRuntimeOwnership(paths, {
+    pid: runtime.pid,
+    configFingerprint: runtime.configFingerprint,
+    ownershipToken: runtime.ownershipToken,
+  })
   await writeBootstrapManifest(manifest)
 
   return {

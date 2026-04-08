@@ -36,6 +36,13 @@ export interface BootstrapRuntimeState {
   pid?: number
   healthUrl?: string
   configFingerprint?: string
+  ownershipToken?: string
+}
+
+export interface BootstrapRuntimeOwnership {
+  pid: number
+  configFingerprint: string
+  ownershipToken: string
 }
 
 export interface BootstrapManifest {
@@ -68,6 +75,7 @@ export interface RuntimePreparationSummary {
   healthUrl: string
   configPath: string
   configFingerprint: string
+  ownershipToken: string
   builtGateway: boolean
 }
 

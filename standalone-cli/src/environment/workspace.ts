@@ -1,6 +1,7 @@
+import { existsSync, lstatSync } from 'fs'
 import { access, mkdir } from 'fs/promises'
 import { homedir } from 'os'
-import { isAbsolute, relative, resolve } from 'path'
+import { isAbsolute, relative, resolve, sep } from 'path'
 
 import type { BootstrapWorkspacePaths } from './types.js'
 
@@ -29,14 +30,41 @@ export function resolveWorkspacePaths(options: WorkspaceOptions = {}): Bootstrap
 }
 
 export function assertWorkspacePath(paths: BootstrapWorkspacePaths, targetPath: string, label: string): string {
+  assertNoSymlinkSegments(paths.homeDir, paths.workspaceRoot, label)
+
   const resolvedTargetPath = resolve(targetPath)
   const relativePath = relative(paths.workspaceRoot, resolvedTargetPath)
 
-  if (relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath))) {
-    return resolvedTargetPath
+  if (relativePath !== '' && (relativePath.startsWith('..') || isAbsolute(relativePath))) {
+    throw new Error(`${label} must stay inside ${paths.workspaceRoot}`)
   }
 
-  throw new Error(`${label} must stay inside ${paths.workspaceRoot}`)
+  assertNoSymlinkSegments(paths.workspaceRoot, resolvedTargetPath, label)
+
+  return resolvedTargetPath
+}
+
+function assertNoSymlinkSegments(rootPath: string, targetPath: string, label: string): void {
+  const relativePath = relative(rootPath, targetPath)
+
+  if (relativePath === '' || relativePath === '.') {
+    if (existsSync(targetPath) && lstatSync(targetPath).isSymbolicLink()) {
+      throw new Error(`${label} must stay inside ${rootPath}`)
+    }
+
+    return
+  }
+
+  const segments = relativePath.split(sep).filter(Boolean)
+  let currentPath = resolve(rootPath)
+
+  for (const segment of segments) {
+    currentPath = resolve(currentPath, segment)
+
+    if (existsSync(currentPath) && lstatSync(currentPath).isSymbolicLink()) {
+      throw new Error(`${label} must stay inside ${rootPath}`)
+    }
+  }
 }
 
 export async function ensureWorkspace(paths: BootstrapWorkspacePaths): Promise<void> {
