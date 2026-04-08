@@ -12,7 +12,7 @@
 
 ### Environment Bootstrap
 
-- [ ] **ENV-01**: Operator can run the new standalone CLI on a machine with an existing Claude Code login and have it detect usable local Claude OAuth credentials from supported local sources or receive an actionable failure message.
+- [x] **ENV-01**: Operator can run the new standalone CLI on a machine with an existing Claude Code login and have it detect usable local Claude OAuth credentials from supported local sources or receive an actionable failure message.
 - [ ] **ENV-02**: New CLI can generate or reuse canonical identity, client token, and local config or workspace artifacts needed for a local Claude-through-gateway session without editing the existing TypeScript or Rust applications.
 - [ ] **ENV-03**: Re-running the new CLI on the same machine is idempotent and does not duplicate or corrupt previously generated bootstrap artifacts.
 - [ ] **ENV-04**: New CLI honors local outbound proxy settings expressed through the existing `HTTPS_PROXY` / `HTTP_PROXY` style environment variables.
@@ -56,7 +56,7 @@
 | ANA-01 | Phase 5 | Complete |
 | ANA-02 | Phase 5 | Complete |
 | ISO-01 | Phase 5 | Complete |
-| ENV-01 | Phase 6 | Pending |
+| ENV-01 | Phase 6 | Complete |
 | ISO-02 | Phase 6 | Complete |
 | ENV-02 | Phase 7 | Pending |
 | ENV-03 | Phase 7 | Pending |
@@ -76,4 +76,4 @@
 
 ---
 *Requirements defined: 2026-04-08*
-*Last updated: 2026-04-08 after starting milestone v1.1*
+*Last updated: 2026-04-08 after completing ENV-01*
