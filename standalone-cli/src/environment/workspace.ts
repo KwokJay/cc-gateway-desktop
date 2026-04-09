@@ -9,6 +9,7 @@ const DEFAULT_WORKSPACE_SEGMENTS = ['.ccgw', 'standalone-cli'] as const
 const MANIFEST_FILE = 'manifest.json'
 const CONFIG_FILE = 'config.yaml'
 const RUNTIME_FILE = 'runtime.json'
+const RUNTIME_LOG_FILE = 'gateway.log'
 
 export interface WorkspaceOptions {
   homeDir?: string
@@ -26,6 +27,7 @@ export function resolveWorkspacePaths(options: WorkspaceOptions = {}): Bootstrap
     manifestPath: resolve(workspaceRoot, MANIFEST_FILE),
     configPath: resolve(workspaceRoot, CONFIG_FILE),
     runtimePath: resolve(workspaceRoot, RUNTIME_FILE),
+    runtimeLogPath: resolve(workspaceRoot, RUNTIME_LOG_FILE),
   }
 }
 

@@ -5,6 +5,7 @@ export interface BootstrapWorkspacePaths {
   manifestPath: string
   configPath: string
   runtimePath: string
+  runtimeLogPath: string
 }
 
 export interface BootstrapIdentity {

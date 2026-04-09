@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { spawn } from 'child_process'
-import { access } from 'fs/promises'
+import { closeSync, openSync } from 'fs'
+import { access, readFile } from 'fs/promises'
 import { request } from 'http'
 import { dirname, resolve } from 'path'
 import { fileURLToPath } from 'url'
@@ -27,6 +28,7 @@ export interface SpawnGatewayInput {
   args: string[]
   cwd: string
   env: Record<string, string | undefined>
+  logPath: string
 }
 
 export interface HealthCheckResult {
@@ -42,6 +44,7 @@ export interface RuntimeAdapters {
   checkHealth(url: string): Promise<HealthCheckResult>
   sleep(ms: number): Promise<void>
   stopRuntime(pid: number): Promise<void>
+  isProcessAlive(pid: number): Promise<boolean>
 }
 
 export interface EnsureRuntimeOptions {
@@ -92,12 +95,15 @@ async function defaultBuildGateway(input: BuildGatewayInput): Promise<void> {
 }
 
 async function defaultSpawnGateway(input: SpawnGatewayInput): Promise<{ pid: number }> {
+  const logFd = openSync(input.logPath, 'a')
   const child = spawn(input.command, input.args, {
     cwd: input.cwd,
     env: input.env,
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', logFd, logFd],
   })
+
+  closeSync(logFd)
 
   child.unref()
 
@@ -157,6 +163,25 @@ async function defaultStopRuntime(pid: number): Promise<void> {
   }
 }
 
+async function defaultIsProcessAlive(pid: number): Promise<boolean> {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) {
+      if (error.code === 'ESRCH') {
+        return false
+      }
+
+      if (error.code === 'EPERM') {
+        return true
+      }
+    }
+
+    throw error
+  }
+}
+
 function resolveRuntimeAdapters(overrides: Partial<RuntimeAdapters> = {}): RuntimeAdapters {
   return {
     fileExists: overrides.fileExists ?? defaultFileExists,
@@ -165,6 +190,7 @@ function resolveRuntimeAdapters(overrides: Partial<RuntimeAdapters> = {}): Runti
     checkHealth: overrides.checkHealth ?? defaultCheckHealth,
     sleep: overrides.sleep ?? delay,
     stopRuntime: overrides.stopRuntime ?? defaultStopRuntime,
+    isProcessAlive: overrides.isProcessAlive ?? defaultIsProcessAlive,
   }
 }
 
@@ -202,6 +228,8 @@ async function waitForHealthyRuntime(
   adapters: RuntimeAdapters,
   timeoutMs: number,
   pollIntervalMs: number,
+  pid: number,
+  logPath: string,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs
   let lastDetail = 'runtime did not report healthy state'
@@ -217,6 +245,15 @@ async function waitForHealthyRuntime(
 
     lastDetail = health.detail ?? `status ${health.status ?? 'unknown'}`
 
+    if (!(await adapters.isProcessAlive(pid))) {
+      const startupDetail = await readRuntimeLogExcerpt(logPath)
+      throw new Error(
+        startupDetail
+          ? `Gateway process exited before readiness check succeeded: ${startupDetail}`
+          : `Gateway process exited before readiness check succeeded: ${lastDetail}`,
+      )
+    }
+
     if (Date.now() >= deadline) {
       break
     }
@@ -225,6 +262,24 @@ async function waitForHealthyRuntime(
   }
 
   throw new Error(`Gateway readiness timed out while waiting for ${healthUrl}: ${lastDetail}`)
+}
+
+async function readRuntimeLogExcerpt(path: string): Promise<string | null> {
+  try {
+    const raw = await readFile(path, 'utf8')
+    const lines = raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    if (lines.length === 0) {
+      return null
+    }
+
+    return lines.slice(-5).join(' | ')
+  } catch {
+    return null
+  }
 }
 
 function canStopOwnedRuntime(
@@ -253,6 +308,7 @@ export async function ensureGatewayRuntime(
   const sourceEnv = resolveSourceEnv(options.processEnv)
   const { proxyEnv } = resolveProxyEnvironment(sourceEnv)
   const entrypointPath = resolve(repoRoot, ...ENTRYPOINT_SEGMENTS)
+  const runtimeLogPath = manifest.paths.runtimeLogPath
   const port = manifest.runtime?.port ?? DEFAULT_RUNTIME_PORT
   const healthUrl = manifest.runtime?.healthUrl ?? `http://127.0.0.1:${port}/_health`
   const configFingerprint = manifest.generatedConfig.renderFingerprint
@@ -309,10 +365,18 @@ export async function ensureGatewayRuntime(
       ...sourceEnv,
       ...proxyEnv,
     },
+    logPath: runtimeLogPath,
   })
 
   try {
-    await waitForHealthyRuntime(healthUrl, adapters, timeoutMs, pollIntervalMs)
+    await waitForHealthyRuntime(
+      healthUrl,
+      adapters,
+      timeoutMs,
+      pollIntervalMs,
+      runtimeProcess.pid,
+      runtimeLogPath,
+    )
   } catch (error) {
     await adapters.stopRuntime(runtimeProcess.pid)
     throw error

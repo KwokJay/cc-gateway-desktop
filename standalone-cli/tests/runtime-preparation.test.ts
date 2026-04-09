@@ -47,7 +47,7 @@ type RuntimeHarnessOptions = {
 
 type RuntimeHarness = {
   buildCalls: Array<{ command: string; args: string[]; cwd: string }>
-  spawnCalls: Array<{ command: string; args: string[]; cwd: string; env: Record<string, string | undefined> }>
+  spawnCalls: Array<{ command: string; args: string[]; cwd: string; env: Record<string, string | undefined>; logPath: string }>
   killCalls: number[]
   healthChecks: string[]
   sleepCalls: number[]
@@ -59,10 +59,12 @@ type RuntimeHarness = {
       args: string[]
       cwd: string
       env: Record<string, string | undefined>
+      logPath: string
     }): Promise<{ pid: number }>
     checkHealth(url: string): Promise<HealthResult>
     sleep(ms: number): Promise<void>
     stopRuntime(pid: number): Promise<void>
+    isProcessAlive(pid: number): Promise<boolean>
   }
 }
 
@@ -116,6 +118,9 @@ function createRuntimeHarness(options: RuntimeHarnessOptions = {}): RuntimeHarne
       },
       async stopRuntime(pid) {
         killCalls.push(pid)
+      },
+      async isProcessAlive() {
+        return true
       },
     },
   }
@@ -242,6 +247,7 @@ async function captureRun(
     assert.equal(harness.spawnCalls[0]?.command, 'node')
     assert.deepEqual(harness.spawnCalls[0]?.args, ['dist/index.js', bootstrap.configPath])
     assert.equal(harness.spawnCalls[0]?.cwd, REAL_REPO_ROOT)
+    assert.equal(harness.spawnCalls[0]?.logPath, bootstrap.workspacePaths.runtimeLogPath)
     assert.equal(
       harness.spawnCalls[0]?.env.HTTPS_PROXY,
       'http://proxy.example.test:8443',
@@ -390,6 +396,39 @@ async function captureRun(
       'pid shutdown must require matching runtime.json ownership evidence instead of blindly stopping a stale manifest pid',
     )
     assert.equal(harness.spawnCalls.length, 1, 'mismatched runtime.json ownership should clear stale state and start fresh')
+  })
+}
+
+{
+  await withTempWorkspace(async (workspace) => {
+    const bootstrap = await bootstrapEnvironment(fixtureCredentials(), {
+      homeDir: workspace.fakeHomeDir,
+      cwd: workspace.repoRoot,
+      now: () => '2026-04-08T00:00:00.000Z',
+    })
+    const manifest = await workspace.readJson<BootstrapManifest>(bootstrap.manifestPath)
+    const harness = createRuntimeHarness({
+      healthResults: [{ ok: false, detail: 'connect ECONNREFUSED 127.0.0.1:8443' }],
+    })
+
+    await writeFile(
+      bootstrap.workspacePaths.runtimeLogPath,
+      '[INFO] CC Gateway starting...\nFatal: OAuth refresh failed (400): {"error":"invalid_grant"}\n',
+      'utf8',
+    )
+
+    harness.adapters.isProcessAlive = async () => false
+
+    await assert.rejects(
+      prepareRuntimeEnvironment(fixtureCredentials(), {
+        homeDir: workspace.fakeHomeDir,
+        cwd: workspace.repoRoot,
+        now: () => '2026-04-08T00:05:00.000Z',
+        runtime: harness.adapters,
+      }),
+      /Gateway process exited before readiness check succeeded: .*invalid_grant/i,
+      'runtime preparation should surface the startup log excerpt when the gateway exits before health succeeds',
+    )
   })
 }
 
