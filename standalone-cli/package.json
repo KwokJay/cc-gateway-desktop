@@ -48,6 +48,7 @@
     "test:credentials": "tsx tests/credential-discovery.test.ts"
   },
   "dependencies": {
+    "https-proxy-agent": "^9.0.0",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
