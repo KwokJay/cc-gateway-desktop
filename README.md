@@ -5,351 +5,271 @@
     <img alt="CC Gateway" src=".github/logo-light.svg" width="440">
   </picture>
 
-  <p>Take back control of your AI API telemetry</p>
+  <p>Privacy-preserving Claude Code gateway with standalone, daemon, CLI, and desktop workflows</p>
 </div>
 
 <div align="center">
 
 [![License: MIT][license-shield]][license-url]
 [![Version][version-shield]][version-url]
-[![Tests][tests-shield]][tests-url]
-[![Follow @whiletrue0x][twitter-shield]][twitter-url]
 
 </div>
 
 <div align="center">
   <a href="#quick-start">Quick Start</a> &middot;
-  <a href="#add-clients">Add Clients</a> &middot;
-  <a href="#what-gets-rewritten">What Gets Rewritten</a> &middot;
-  <a href="#deployment">Deployment</a> &middot;
-  <a href="#changelog">Changelog</a>
+  <a href="#usage-paths">Usage Paths</a> &middot;
+  <a href="#configuration-model">Configuration</a> &middot;
+  <a href="#validation">Validation</a> &middot;
+  <a href="#repo-layout">Repo Layout</a>
 </div>
 
 ---
 
-> **Acknowledgement** — This project originated from and pays tribute to [motiful/cc-gateway](https://github.com/motiful/cc-gateway). CC Gateway Desktop builds on that foundation while evolving the codebase toward the Rust daemon, CLI, and desktop experience in this repository.
+> **Acknowledgement** — This project originated from and pays tribute to [motiful/cc-gateway](https://github.com/motiful/cc-gateway). This repository extends that work with a Rust-first daemon and core, a local launcher, a Tauri desktop app, and a standalone bootstrap CLI.
 
-> **Alpha** — This project is under active development. Test with a non-primary account first.
+> **Current focus** — `cc-gateway-desktop` is now a brownfield monorepo: the original TypeScript gateway remains as the behavioral reference, while the Rust daemon, Rust launcher, desktop UI, and standalone CLI are the long-term operator surfaces.
 
 > **Disclaimer** — See [full disclaimer](#disclaimer) below.
 
 ## Why
 
-Claude Code collects **640+ telemetry event types** across 3 parallel channels, fingerprints your machine with **40+ environment dimensions**, and phones home every 5 seconds. Your device ID, email, OS version, installed runtimes, shell type, CPU architecture, and physical RAM are all reported to the vendor — continuously.
+Claude Code sends rich device, environment, and process telemetry upstream. If you use Claude Code across multiple machines, there is no built-in operator control over how that identity is presented.
 
-If you run Claude Code on multiple machines, each device gets a unique permanent identifier. There is no built-in way to manage how your identity is presented to the API.
+CC Gateway provides one controllable layer between Claude Code and Anthropic. It lets operators define a canonical identity and runtime profile, centralize OAuth lifecycle handling, and route local or remote Claude Code sessions through a single managed gateway.
 
-CC Gateway is a reverse proxy that sits between Claude Code and the Anthropic API. It normalizes device identity, environment fingerprints, and process metrics to a single canonical profile — giving you control over what telemetry leaves your network.
+## What this repository includes now
+
+This repository is no longer only the original Node reverse proxy. It currently contains five major surfaces:
+
+1. **Standalone bootstrap CLI (`standalone-cli/`)**
+   Published as `ccgw`, this is the easiest local entry point. It discovers Claude credentials, prepares a local standalone workspace, ensures a healthy runtime, and launches `claude` with the gateway environment.
+
+2. **Rust daemon (`crates/daemon/`)**
+   The production-oriented HTTP/TLS reverse proxy that loads `config.yaml`, rewrites requests, manages OAuth refresh, and exposes health information.
+
+3. **Rust launcher CLI (`crates/cli/`)**
+   The local `ccg` command for launcher-style flows such as `status`, `hijack`, `release`, and direct Claude launches through the gateway.
+
+4. **Desktop app (`crates/desktop/`)**
+   A Tauri + React operator UI for daemon status, config inspection/editing, logs, notifications, and desktop preferences such as autostart/start-minimized.
+
+5. **TypeScript reference gateway (`src/`, `scripts/`)**
+   The original implementation remains in-tree as a working reference and compatibility surface. Scripts such as `quick-setup.sh` and `add-client.sh` still support legacy/manual bootstrap flows.
 
 ## Features
 
-- **Full identity rewrite** — device ID, email, session metadata, and the `user_id` JSON blob in every API request are normalized to one canonical identity
-- **40+ environment dimensions replaced** — platform, architecture, Node.js version, terminal, package managers, runtimes, CI flags, deployment environment — the entire `env` object is swapped, not patched
-- **System prompt sanitization** — the `<env>` block injected into every prompt (Platform, Shell, OS Version, working directory) is rewritten to match the canonical profile
-- **Billing header stripped** — the `x-anthropic-billing-header` (which contains a per-session fingerprint hash) is removed entirely, consistent with the official `CLAUDE_CODE_ATTRIBUTION_HEADER=false` toggle. This also enables [cross-session prompt cache sharing](https://github.com/anthropics/claude-code/issues/40652), reducing system prompt costs by ~85%
-- **Process metrics normalization** — physical RAM (`constrainedMemory`), heap size, and RSS are masked to canonical values so hardware differences don't leak
-- **Zero-login client setup** — clients receive a single launcher script. No browser OAuth, no `~/.zshrc` changes, no config files
-- **Centralized OAuth** — the gateway manages token refresh internally; client machines never contact `platform.claude.com`
-- **Instant startup** — gateway uses your existing access token on launch. No network call until the token actually expires
-- **Proxy-aware** — supports `HTTPS_PROXY` / `HTTP_PROXY` env vars for outbound connections (Clash, V2Ray, etc.)
-- **Telemetry leak prevention** — strips `baseUrl` and `gateway` fields that would reveal proxy usage in analytics events
+- **Canonical identity rewriting** for device ID, email, account/session identifiers, and request metadata
+- **Canonical environment replacement** for platform, architecture, Node version, terminal, package managers, CI flags, deployment environment, and related runtime fields
+- **System prompt sanitization** for the injected `<env>` block (`Platform`, `Shell`, `OS Version`, `Working directory`)
+- **Process telemetry normalization** for constrained memory and runtime heap/RSS ranges
+- **Header rewriting and stripping**, including billing-header removal and other leak-prone fields
+- **Centralized OAuth lifecycle management** so the gateway owns token refresh rather than every client machine
+- **Standalone local bootstrap flow** via `ccgw`, including reusable workspace artifacts under `~/.ccgw/standalone-cli/`
+- **Launcher-based client flows** via `ccg` and generated launchers that forward all normal Claude arguments
+- **Desktop operator workflow** for config review, daemon health, logs, notifications, and local preferences
+- **Remote/self-hosted deployment support** through shared config, client tokens, optional TLS, and daemon health endpoints
+- **Brownfield parity path** where the TypeScript implementation remains available while the Rust-first path becomes the long-term product surface
 
 ## Quick Start
 
-One command. Requires Node.js 22+ and an existing Claude Code login on this machine.
+### Option A — Standalone CLI (recommended for local use)
+
+Install the published bootstrap CLI:
 
 ```bash
-git clone https://github.com/motiful/cc-gateway.git
-cd cc-gateway
+npm install -g ccgw
+ccgw
+```
+
+On first run, `ccgw` will:
+
+1. Discover local Claude credentials
+2. Create the standalone workspace under `~/.ccgw/standalone-cli/`
+3. Write operator-visible artifacts such as `manifest.json`, `config.yaml`, and `runtime.json`
+4. Prepare or reuse a healthy local runtime
+5. Launch the locally installed `claude` binary with gateway environment variables
+
+Useful subcommands:
+
+```bash
+ccgw discover-credentials
+ccgw prepare-runtime
+ccgw --help
+ccgw --print "hello"
+```
+
+The standalone operator guide lives in [`standalone-cli/README.md`](standalone-cli/README.md).
+
+### Option B — Desktop app (recommended for local operators who want a UI)
+
+From the repository root:
+
+```bash
+cargo build --workspace
+npm --prefix crates/desktop install
+npm --prefix crates/desktop run tauri dev
+```
+
+The desktop app expects a `ccgw-daemon` binary either in the workspace build output (`target/debug/ccgw-daemon`) or on `PATH`. It uses `~/.ccgw/config.yaml` by default and writes desktop log output to `~/.ccgw/logs/desktop-daemon.log`.
+
+### Option C — Manual / legacy script flow
+
+If you want the original bootstrap path that writes a local `config.yaml` and generates client launchers:
+
+```bash
 npm install
 bash scripts/quick-setup.sh
 ```
 
-This will:
-1. Extract your OAuth credentials from macOS Keychain (access token + refresh token)
-2. Generate a canonical device identity and client token
-3. Write `config.yaml`
-4. Generate a client launcher at `./clients/cc-<hostname>`
-5. Start the gateway on `http://localhost:8443`
-
-### Use it
-
-In another terminal:
-
-```bash
-./clients/cc-<hostname>
-```
-
-That's it. Claude Code launches, traffic routes through the gateway. No env vars to set, no files to edit.
-
-### Behind a proxy?
-
-```bash
-HTTPS_PROXY=http://127.0.0.1:7890 bash scripts/quick-setup.sh
-```
-
-The gateway will route all outbound traffic (API calls + token refresh) through your proxy.
-
-## Add Clients
-
-Each person gets their own launcher script with a unique token. The admin generates it:
+Then add more launcher scripts as needed:
 
 ```bash
 bash scripts/add-client.sh alice
 bash scripts/add-client.sh bob
 ```
 
-This creates `./clients/cc-alice` and `./clients/cc-bob`. Send each file to the respective person.
+This path remains useful for manual or legacy operator flows, but it reflects the TypeScript reference implementation rather than the newer standalone or desktop-first flows.
 
-### Client setup (what you tell them)
+## Usage Paths
 
-```bash
-chmod +x cc-alice
-./cc-alice install        # installs as 'ccg' command
-ccg                       # start Claude Code through gateway
-```
+### 1) Standalone `ccgw`
 
-That's it. All Claude arguments work: `ccg --print "hello"`, `ccg --resume`, etc.
-
-### Optional: make `claude` go through gateway too
+Use `ccgw` when you want one self-contained local operator flow:
 
 ```bash
-ccg hijack                # alias claude → ccg (new terminals auto-apply)
-claude                    # now goes through gateway
-ccg release               # undo — restore native claude
+ccgw
+ccgw discover-credentials
+ccgw prepare-runtime
+ccgw [claude args]
 ```
 
-### All commands
+Behavior summary:
 
-```
-ccg                       Start Claude Code through gateway
-ccg install               Install as 'ccg' system command
-ccg uninstall             Remove 'ccg' and clean up
-ccg hijack                Make 'claude' also go through gateway
-ccg release               Restore 'claude' to native
-ccg native [args]         Run native claude once (bypass gateway)
-ccg status                Show gateway connection and hijack status
-ccg help                  Show help
-```
+- discovers or reuses Claude credentials
+- maintains stable workspace state in `~/.ccgw/standalone-cli/`
+- re-renders config/runtime state instead of creating duplicate bootstrap artifacts
+- prepares the gateway runtime before launching `claude`
 
-`ccg` and `claude` coexist by default. Hijack is opt-in and reversible. Supports zsh, bash, and fish.
+### 2) Local launcher `ccg`
 
-## What Gets Rewritten
-
-| Layer | Field | Action |
-|-------|-------|--------|
-| **Identity** | `device_id` in metadata + events | → canonical ID |
-| | `email` | → canonical email |
-| **Environment** | `env` object (40+ fields) | → entire object replaced |
-| **Process** | `constrainedMemory` (physical RAM) | → canonical value |
-| | `rss`, `heapTotal`, `heapUsed` | → randomized in realistic range |
-| **Headers** | `User-Agent` | → canonical CC version |
-| | `x-api-key` | → real OAuth token (injected by gateway) |
-| | `x-anthropic-billing-header` | → stripped |
-| | repeated request header values | → coalesced into one comma-separated value (TS parity) |
-| **Prompt text** | `Platform`, `Shell`, `OS Version` | → canonical values |
-| | `Working directory` | → canonical path |
-| | `/Users/xxx/`, `/home/xxx/` | → canonical home prefix |
-| **Billing** | `x-anthropic-billing-header` system block | → stripped entirely |
-| **Leak fields** | `baseUrl` (ANTHROPIC_BASE_URL) | → stripped |
-| | `gateway` (provider detection) | → stripped |
-
-`canonical_profile.rewrite_policy` is active at runtime. `mode` supports `aggressive`, `conservative`, and `passthrough`; `strip_billing_header` controls billing-header removal; `normalize_timestamps` normalizes common event timestamp fields; and `preserve_fields` restores selected JSON paths from the original payload after rewriting.
-
-## Deployment
-
-### Local (development)
+Use `ccg` when you already have a configured gateway and want a launcher-oriented workflow:
 
 ```bash
-npm run dev    # tsx watch, auto-reload
+ccg
+ccg status
+ccg hijack
+ccg release
+ccg native --help
 ```
 
-### Docker (production)
+`ccg` is the Rust launcher surface in `crates/cli/`. It is designed for local install/uninstall, status checks, shell aliasing, and launching Claude Code through a configured gateway endpoint.
+
+### 3) Daemon-only runtime
+
+Use the Rust daemon directly when you want an explicit config-driven server process:
 
 ```bash
-bash scripts/admin-setup.sh
+cargo run -p ccgw-daemon -- config.yaml
 ```
 
-This interactive script:
-1. Extracts OAuth credentials
-2. Generates config + first client launcher
-3. Builds and starts the Docker container
-4. Asks for the gateway address clients should connect to
+If you omit the config path, the daemon defaults to `config.yaml` in the working directory.
 
-After setup, add more clients with:
+### 4) Desktop operator UI
+
+Use the desktop app when you want a visual control surface for:
+
+- daemon health and startup state
+- config file inspection/editing
+- log viewing and filtering
+- desktop preferences such as autostart and start minimized
+- visibility into canonical profile, OAuth presence, launcher availability, and proxy-related summary data
+
+## Configuration Model
+
+The main config contract is still YAML-based.
+
+Start from:
+
+- [`config.example.yaml`](config.example.yaml)
+- [`config/canonical-profile.example.json`](config/canonical-profile.example.json)
+- [`config/canonical-profile.schema.json`](config/canonical-profile.schema.json)
+
+Key model concepts:
+
+- `server` — local bind port and optional TLS cert/key paths
+- `upstream` — Anthropic API upstream URL
+- `oauth` — access token, refresh token, and expiry tracking managed by the gateway
+- `auth.tokens` — per-client tokens for launcher/client authentication
+- `identity` — canonical device/user identifiers
+- `env` — canonical environment fingerprint
+- `prompt_env` — prompt-visible environment values
+- `process` — canonical memory and runtime metric ranges
+- `canonical_profile_path` — optional external JSON profile that overrides inline identity/env/prompt/process sections
+
+Common runtime paths used by the current repo:
+
+- `~/.ccgw/config.yaml` — default desktop config path
+- `~/.ccgw/logs/desktop-daemon.log` — default desktop-managed daemon log path
+- `~/.ccgw/desktop-settings.json` — desktop settings
+- `~/.ccgw/standalone-cli/manifest.json` — standalone workspace manifest
+- `~/.ccgw/standalone-cli/runtime.json` — standalone runtime state
+
+## Validation
+
+Use the validation command that matches the surface you changed:
 
 ```bash
-bash scripts/add-client.sh <name>
-# Restart to pick up new tokens:
-docker compose restart
+npm test                              # TypeScript reference gateway tests
+cargo test                            # Rust workspace tests
+npm --prefix standalone-cli test      # standalone bootstrap CLI validation
+npm --prefix crates/desktop test      # desktop frontend tests
 ```
 
-### Multi-machine deployment
-
-```
-Mac-A ──┐
-Mac-B ──┼──→ gateway-server:8443 ──→ api.anthropic.com
-Mac-C ──┘
-```
-
-**Important:** All machines — including the admin — should use the gateway. Direct connections from the admin machine would create a second device fingerprint visible to Anthropic.
-
-For remote deployment, generate TLS certificates:
+Useful build commands:
 
 ```bash
-mkdir certs
-openssl req -x509 -newkey rsa:2048 \
-  -keyout certs/key.pem -out certs/cert.pem \
-  -days 365 -nodes -subj "/CN=cc-gateway"
+npm run build
+cargo build --workspace
+npm --prefix standalone-cli run build
+npm --prefix crates/desktop run build
 ```
 
-Uncomment the `tls` section in `config.yaml`, then generate client launchers pointing to the server address:
+## Repo Layout
 
-```bash
-bash scripts/add-client.sh alice "" <gateway-ip>:8443 https
+```text
+src/                         TypeScript reference gateway
+scripts/                     Legacy/manual bootstrap scripts
+tests/                       TypeScript reference tests
+standalone-cli/              Published standalone bootstrap CLI (`ccgw`)
+crates/core/                 Shared Rust config, OAuth, logging, rewrite logic
+crates/daemon/               Rust gateway daemon (`ccgw-daemon`)
+crates/cli/                  Rust launcher CLI (`ccg`)
+crates/desktop/              React/Tauri desktop app
+config/                      Canonical profile examples and schema
+docs/                        Supporting docs and design notes
 ```
-
-### Alternative: Tailscale (zero config networking)
-
-If all devices have Tailscale installed, run the gateway on any machine in the mesh. No TLS needed (Tailscale encrypts the tunnel), no public IP needed, no port forwarding.
-
-## Architecture
-
-```
-Client machines                        CC Gateway                    Anthropic
-┌────────────┐                    ┌──────────────────┐
-│ ./cc-alice  │── ANTHROPIC_ ────│  Auth: x-api-key  │
-│  (launcher) │   BASE_URL       │  OAuth: auto-     │
-│  + env vars │                  │    refresh        │──── single ────▶ api.anthropic.com
-│             │                  │  Rewrite: all     │     identity
-│             │                  │    identity       │
-└────────────┘                    │  Strip: billing   │
-                                  │    header         │
-                                  │  Stream: SSE      │
-                                  │    passthrough    │
-                                  └──────────────────┘
-                                         │
-                                   platform.claude.com
-                                   (token refresh only,
-                                    from gateway IP)
-```
-
-**Defense in depth:**
-
-| Layer | Mechanism | What it prevents |
-|-------|-----------|-----------------|
-| Launcher env vars | `ANTHROPIC_BASE_URL` + `DISABLE_NONESSENTIAL` + `ATTRIBUTION_HEADER=false` | CC voluntarily routes to gateway, disables side channels, skips billing hash |
-| Clash (optional) | Domain-based REJECT rules | Any accidental or future direct connections to Anthropic |
-| Gateway | Body + header + prompt rewriting | All 40+ fingerprint dimensions normalized to one device |
-
-## OAuth Lifecycle
-
-The gateway manages the full OAuth token lifecycle:
-
-1. **Startup** — uses the existing access token from your keychain. Zero network calls.
-2. **Auto-refresh** — 5 minutes before expiry, the gateway silently refreshes via `platform.claude.com`.
-3. **Continuous** — refresh tokens rotate automatically. The gateway runs indefinitely without admin intervention.
-4. **Failure recovery** — if a refresh fails, retries every 30 seconds. Only a refresh token expiry (rare, months) requires re-running `extract-token.sh`.
-
-Clients never contact `platform.claude.com`. They send requests to the gateway with their client token; the gateway injects the real OAuth token before forwarding upstream.
-
-## Clash Rules
-
-Optional network-level safety net. Even if Claude Code bypasses env vars or adds new hardcoded endpoints in a future update, Clash blocks direct connections.
-
-```yaml
-rules:
-  - DOMAIN,gateway.your-domain.com,DIRECT    # Allow gateway
-  - DOMAIN-SUFFIX,anthropic.com,REJECT        # Block direct API
-  - DOMAIN-SUFFIX,claude.com,REJECT           # Block OAuth
-  - DOMAIN-SUFFIX,claude.ai,REJECT            # Block OAuth
-  - DOMAIN-SUFFIX,datadoghq.com,REJECT        # Block telemetry
-```
-
-See [`clash-rules.yaml`](clash-rules.yaml) for the full template.
 
 ## Caveats
 
-- **MCP servers** — `mcp-proxy.anthropic.com` is hardcoded and does not follow `ANTHROPIC_BASE_URL`. If clients use official MCP servers, those requests bypass the gateway. Use Clash to block this domain if MCP is not needed.
-- **CC updates** — New Claude Code versions may introduce new telemetry fields or endpoints. Monitor Clash REJECT logs for unexpected connection attempts after upgrades.
-- **Token lifecycle** — The gateway auto-refreshes the OAuth access token. If the underlying refresh token expires (rare), re-run `extract-token.sh` on the admin machine.
-
-## Changelog
-
-### v0.2.0 (2026-04-02)
-
-**Billing header strategy overhaul**
-- Stripped the `x-anthropic-billing-header` entirely (system prompt block + HTTP header) instead of rewriting the hash. This is consistent with the official `CLAUDE_CODE_ATTRIBUTION_HEADER=false` env var and enables cross-session prompt cache sharing (~85% cost reduction on system prompt).
-- The CCH hash algorithm (reverse-engineered from `cli.js`) is implemented as a fallback but not active by default.
-
-**Zero-login client setup**
-- New `add-client.sh` generates self-contained launcher scripts (`./clients/cc-<name>`). Clients run one file — no `~/.zshrc` changes, no config files, no browser login.
-- Launcher uses `ANTHROPIC_API_KEY` for gateway auth instead of the fragile `CLAUDE_CODE_OAUTH_TOKEN` + `ANTHROPIC_CUSTOM_HEADERS` approach.
-
-**Instant gateway startup**
-- OAuth now uses the existing access token from Keychain on launch. No network call until the token actually needs refreshing.
-- `config.yaml` supports `access_token` + `expires_at` fields alongside `refresh_token`.
-
-**Proxy support**
-- Gateway respects `HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY` env vars for all outbound connections (API calls + token refresh).
-
-**Observability**
-- Connection-level request logging: every inbound request is logged with client IP before auth, and client name after auth.
-
-**Admin tooling**
-- `admin-setup.sh` — interactive Docker deployment with credential extraction and client generation.
-- `quick-setup.sh` — one-command local setup that extracts full credentials (access + refresh + expiry).
-
-### v0.1.0 (2026-04-01)
-
-Initial release. Identity rewriting, environment normalization, centralized OAuth, SSE passthrough.
+- The repository still carries both TypeScript and Rust gateway implementations, so behavior parity matters.
+- Official MCP-related traffic may still require separate handling because some upstream endpoints do not follow `ANTHROPIC_BASE_URL`.
+- The desktop app and standalone CLI improve local operator experience, but they do not eliminate the need to review config, credentials, and deployment boundaries carefully.
 
 ## References
 
-This project builds on:
+This repository builds on and extends:
 
-- [Claude Code 封号机制深度探查报告](https://bytedance.larkoffice.com/docx/E2JudVzf7oCNfhxyxaQcZIW1n0g) — Reverse-engineering analysis of Claude Code's 640+ telemetry events, 40+ fingerprint dimensions, and ban detection mechanisms
-- [cc-cache-audit](https://github.com/motiful/cc-cache-audit) — A/B test proving the billing header breaks prompt cache sharing, with the one-line fix
-- [instructkr/claude-code](https://github.com/instructkr/claude-code) — Deobfuscated Claude Code source used for the telemetry audit
-
-## Star History
-
-<div align="center">
-  <a href="https://star-history.com/#motiful/cc-gateway&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=motiful/cc-gateway&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=motiful/cc-gateway&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=motiful/cc-gateway&type=Date" width="600" />
-    </picture>
-  </a>
-</div>
-
-## Why This Exists
-
-I pay Anthropic $200/month. I have for almost a year.
-
-I own a laptop, a desktop, and a tablet. Three devices, one person, one subscription. I logged into a fourth device and my account was banned. No warning. No explanation. No refund. No way to export my conversation history. No customer support to contact.
-
-I'm not in the US. For non-US subscribers, there is no appeals process. The ban is permanent and silent.
-
-This project is not a hack. It is not a crack. It does not bypass rate limits, share accounts, or steal service. It is a reverse proxy that makes my own devices — devices I already paid for access to — present a consistent identity to an API that I already pay for.
-
-The technical approach is conservative by design:
-
-- **Billing header**: stripped using the same official env var (`CLAUDE_CODE_ATTRIBUTION_HEADER=false`) that Anthropic built into their own code. Thousands of legitimate users already have this set.
-- **Identity normalization**: all devices report the same device ID, email, and environment. This is indistinguishable from one person using one machine.
-- **Fixed IP**: the gateway routes all traffic through a single static IP. Anthropic sees one device, one location, one user.
-- **No evasion**: we don't fake locations, rotate IPs, or circumvent rate limits. If Anthropic's detection looks at this traffic, it looks normal — because it IS normal. One person using their subscription.
-
-If Anthropic offered a way to manage multiple devices — a device dashboard, a family plan, a per-seat enterprise option — this tool would not need to exist. They don't. So it does.
+- [motiful/cc-gateway](https://github.com/motiful/cc-gateway)
+- [cc-cache-audit](https://github.com/motiful/cc-cache-audit)
+- [instructkr/claude-code](https://github.com/instructkr/claude-code)
 
 ## Disclaimer
 
 This project is for educational and research purposes only.
 
 - Do NOT use this to share accounts or violate Anthropic's Terms of Service
-- Do NOT use this for commercial purposes
-- The author is not responsible for any consequences of using this software
+- Do NOT use this for commercial abuse
+- Review your deployment, credential handling, and exposure model carefully
 - Use at your own risk
 
 ## License
@@ -363,11 +283,7 @@ This project is for educational and research purposes only.
 </div>
 
 <!-- Badge references -->
-[license-shield]: https://img.shields.io/github/license/motiful/cc-gateway
-[license-url]: https://github.com/motiful/cc-gateway/blob/main/LICENSE
-[version-shield]: https://img.shields.io/badge/version-0.2.0--alpha-blue
-[version-url]: https://github.com/motiful/cc-gateway/releases
-[tests-shield]: https://img.shields.io/badge/tests-16%20passed-brightgreen
-[tests-url]: https://github.com/motiful/cc-gateway/blob/main/tests/rewriter.test.ts
-[twitter-shield]: https://img.shields.io/badge/follow-%40whiletrue0x-1DA1F2?logo=x&logoColor=white
-[twitter-url]: https://x.com/whiletrue0x
+[license-shield]: https://img.shields.io/github/license/KwokJay/cc-gateway-desktop
+[license-url]: https://github.com/KwokJay/cc-gateway-desktop/blob/main/LICENSE
+[version-shield]: https://img.shields.io/badge/version-0.3.0--alpha-blue
+[version-url]: https://github.com/KwokJay/cc-gateway-desktop/releases
