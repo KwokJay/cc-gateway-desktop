@@ -27,6 +27,8 @@
 
 ---
 
+> **Acknowledgement** — This project originated from and pays tribute to [motiful/cc-gateway](https://github.com/motiful/cc-gateway). CC Gateway Desktop builds on that foundation while evolving the codebase toward the Rust daemon, CLI, and desktop experience in this repository.
+
 > **Alpha** — This project is under active development. Test with a non-primary account first.
 
 > **Disclaimer** — See [full disclaimer](#disclaimer) below.
