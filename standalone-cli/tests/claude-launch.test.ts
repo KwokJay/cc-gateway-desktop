@@ -52,6 +52,7 @@ const { runCli } = await import(new URL('../src/cli.ts', import.meta.url).href)
 const { buildClaudeLaunchEnv, launchClaude } = await import(
   new URL('../src/launch/claude.ts', import.meta.url).href
 )
+const { renderPrepareRuntimeLaunchPrompt } = await import(new URL('../src/output.ts', import.meta.url).href)
 
 function fixtureCredentials(overrides: Partial<DiscoveryCredentials> = {}): DiscoveryCredentials {
   return {
@@ -126,6 +127,12 @@ async function captureRun(
     process.stdout.write = originalStdoutWrite
     process.stderr.write = originalStderrWrite
   }
+}
+
+{
+  const prompt = renderPrepareRuntimeLaunchPrompt('Gateway readiness timed out')
+  assert.match(prompt, /Skip and continue\? \(y\/n\)/)
+  assert.doesNotMatch(prompt, /skip\/reject/i)
 }
 
 {

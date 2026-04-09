@@ -31,7 +31,7 @@ export function renderDiscoveryFailure(result: DiscoveryFailure): string {
       ? `Next step:
   Run \`claude\`
   Complete browser login
-  Retry ccgw-standalone-cli discover-credentials
+  Retry ccgw discover-credentials
 `
       : `Next step:
   Re-run \`claude\` and complete browser login if the saved credentials are stale
@@ -47,18 +47,18 @@ ${nextSteps}`
 }
 
 export function renderHelpText(): string {
-  return `CC Gateway Standalone CLI
+  return `ccgw
 
 Usage:
-  ccgw-standalone-cli [claude args]
-  ccgw-standalone-cli help
-  ccgw-standalone-cli -h
-  ccgw-standalone-cli --help
-  ccgw-standalone-cli discover-credentials
-  ccgw-standalone-cli prepare-runtime
+  ccgw [claude args]
+  ccgw help
+  ccgw -h
+  ccgw --help
+  ccgw discover-credentials
+  ccgw prepare-runtime
 
-Phase 8 scope:
-  - claude launch handoff after credential discovery and proxy-aware runtime preparation
+Package scope:
+  - global npm package for Claude launch handoff after credential discovery and proxy-aware runtime preparation
   - does not replace src/, scripts/, crates/core/, crates/daemon/, crates/cli/, or crates/desktop/
   - launch the locally installed claude executable after runtime preparation succeeds
 
@@ -77,7 +77,7 @@ Package-local verification:
   - npx tsx standalone-cli/tests/claude-launch.test.ts
 
 package-local launch verification:
-  - bare invocation and ccgw-standalone-cli [claude args] prepare the runtime first, then exec claude with unchanged argv
+  - bare invocation and ccgw [claude args] prepare the runtime first, then exec claude with unchanged argv
 `
 }
 
@@ -97,7 +97,7 @@ export function renderPrepareRuntimeFailure(detail: string): string {
 Detail: ${detail}
 Next step:
   Check local proxy env, credentials, and gateway build output
-  Retry ccgw-standalone-cli prepare-runtime
+  Retry ccgw prepare-runtime
 `
 }
 
@@ -106,9 +106,7 @@ export function renderPrepareRuntimeLaunchPrompt(detail: string): string {
 
 Detail: ${detail}
 
-Choose how to proceed:
-  skip   Ignore the runtime-preparation error and try to launch Claude anyway
-  reject Stop here and exit without launching Claude
+Skip and continue? (y/n)
 `
 }
 
@@ -127,6 +125,6 @@ Detail: ${detail}
 Next step:
   Install Claude Code if needed: npm install -g @anthropic-ai/claude-code
   Open a new shell and confirm claude --help works from PATH
-  Retry ccgw-standalone-cli [claude args]
+  Retry ccgw [claude args]
 `
 }

@@ -2,6 +2,8 @@
 
 The standalone bootstrap CLI lives in `standalone-cli/` and remains additive to the existing gateway, daemon, CLI, and desktop surfaces. It does not replace those products.
 
+The published npm package and global command name are both `ccgw`.
+
 Use [`standalone-cli/README.md`](../standalone-cli/README.md) as the canonical operator guide and authoritative runbook for:
 
 - first run

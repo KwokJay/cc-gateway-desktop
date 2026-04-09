@@ -35,7 +35,7 @@ async function captureRun(argv: string[]): Promise<CapturedRun> {
 }
 
 function assertHelpContract(helpText: string): void {
-  assert.ok(helpText.includes('claude launch handoff after credential discovery and proxy-aware runtime preparation'))
+  assert.ok(helpText.includes('global npm package for Claude launch handoff after credential discovery and proxy-aware runtime preparation'))
   assert.ok(
     helpText.includes(
       'does not replace src/, scripts/, crates/core/, crates/daemon/, crates/cli/, or crates/desktop/',
@@ -49,7 +49,7 @@ function assertHelpContract(helpText: string): void {
   assert.ok(helpText.includes('npx tsx standalone-cli/tests/proxy-env.test.ts'))
   assert.ok(helpText.includes('npx tsx standalone-cli/tests/runtime-preparation.test.ts'))
   assert.ok(helpText.includes('npx tsx standalone-cli/tests/claude-launch.test.ts'))
-  assert.ok(helpText.includes('ccgw-standalone-cli [claude args]'))
+  assert.ok(helpText.includes('ccgw [claude args]'))
   assert.ok(helpText.includes('prepare-runtime'))
   assert.ok(helpText.includes('launch the locally installed claude executable after runtime preparation succeeds'))
   assert.ok(helpText.includes('discover-credentials'))

@@ -1,20 +1,56 @@
 {
-  "name": "ccgw-standalone-cli",
+  "name": "ccgw",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
-  "description": "Additive standalone CLI scaffold for CC Gateway bootstrap work",
+  "description": "Standalone CC Gateway bootstrap CLI for preparing a local Claude Code runtime and launching claude",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KwokJay/cc-gateway-desktop.git",
+    "directory": "standalone-cli"
+  },
+  "homepage": "https://github.com/KwokJay/cc-gateway-desktop/tree/main/standalone-cli",
+  "bugs": {
+    "url": "https://github.com/KwokJay/cc-gateway-desktop/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "gateway",
+    "proxy",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
-    "ccgw-standalone-cli": "./dist/index.js"
+    "ccgw": "./dist/index.js"
   },
   "scripts": {
     "test": "npm run build && npx tsx tests/run-all.ts",
     "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
     "test:environment": "tsx tests/environment-bootstrap.test.ts",
     "test:proxy-env": "tsx tests/proxy-env.test.ts",
     "test:runtime": "tsx tests/runtime-preparation.test.ts",
     "test:launch": "tsx tests/claude-launch.test.ts",
     "test:help": "tsx tests/cli-help.test.ts",
     "test:credentials": "tsx tests/credential-discovery.test.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
   }
 }

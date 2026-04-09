@@ -81,13 +81,13 @@ async function promptForPrepareRuntimeFailure(detail: string): Promise<'skip' | 
     process.stderr.write(renderPrepareRuntimeLaunchPrompt(detail))
 
     while (true) {
-      const answer = (await rl.question('Enter choice [skip/reject]: ')).trim().toLowerCase()
+      const answer = (await rl.question('')).trim().toLowerCase()
 
-      if (answer === 'skip' || answer === 's') {
+      if (answer === 'y' || answer === 'yes') {
         return 'skip'
       }
 
-      if (answer === 'reject' || answer === 'r' || answer === '') {
+      if (answer === 'n' || answer === 'no' || answer === '') {
         return 'reject'
       }
     }

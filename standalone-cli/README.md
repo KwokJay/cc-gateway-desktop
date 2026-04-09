@@ -1,7 +1,21 @@
-# CC Gateway Standalone CLI
+# ccgw
 
 `standalone-cli/` is the canonical operator guide for the standalone bootstrap CLI.
 This package is additive. It does not replace `src/`, `scripts/`, `crates/core/`, `crates/daemon/`, `crates/cli/`, or `crates/desktop/`.
+
+## Install
+
+Install the published package globally:
+
+```bash
+npm install -g ccgw
+```
+
+Then use the global command:
+
+```bash
+ccgw --help
+```
 
 ## What This Package Does
 
@@ -14,21 +28,21 @@ The standalone CLI gives operators one package-local flow to:
 
 Use the live command surface only:
 
-- `ccgw-standalone-cli`
-- `ccgw-standalone-cli [claude args]`
-- `ccgw-standalone-cli discover-credentials`
-- `ccgw-standalone-cli prepare-runtime`
+- `ccgw`
+- `ccgw [claude args]`
+- `ccgw discover-credentials`
+- `ccgw prepare-runtime`
 
-Bare invocation and `ccgw-standalone-cli [claude args]` follow the same path: discover credentials, prepare runtime, then hand off to `claude` with unchanged argv.
+Bare invocation and `ccgw [claude args]` follow the same path: discover credentials, prepare runtime, then hand off to `claude` with unchanged argv.
 
 ## First Run
 
 On first run, start with either the full handoff flow or the explicit subcommands:
 
 ```bash
-ccgw-standalone-cli
-ccgw-standalone-cli discover-credentials
-ccgw-standalone-cli prepare-runtime
+ccgw
+ccgw discover-credentials
+ccgw prepare-runtime
 ```
 
 The first run will:
@@ -67,8 +81,8 @@ If credential discovery fails because credentials are missing or not available:
 
 1. Run `claude`
 2. Complete browser login
-3. Retry `ccgw-standalone-cli discover-credentials`
-4. Retry `ccgw-standalone-cli` or `ccgw-standalone-cli [claude args]`
+3. Retry `ccgw discover-credentials`
+4. Retry `ccgw` or `ccgw [claude args]`
 
 If stored credentials are stale or malformed, re-run `claude`, complete browser login, and then retry the standalone CLI flow.
 
@@ -79,7 +93,7 @@ If `claude` is missing or cannot be executed, use the same recovery guidance emi
 ```text
 Install Claude Code if needed: npm install -g @anthropic-ai/claude-code
 Open a new shell and confirm claude --help works from PATH
-Retry ccgw-standalone-cli [claude args]
+Retry ccgw [claude args]
 ```
 
 ## Validation

@@ -32,9 +32,10 @@ const repoDoc = readDoc('../../docs/standalone-cli.md')
 assertIncludesAll(
   readme,
   [
-    'ccgw-standalone-cli [claude args]',
-    'ccgw-standalone-cli discover-credentials',
-    'ccgw-standalone-cli prepare-runtime',
+    'npm install -g ccgw',
+    'ccgw [claude args]',
+    'ccgw discover-credentials',
+    'ccgw prepare-runtime',
     'npm --prefix standalone-cli test',
     '~/.ccgw/standalone-cli/manifest.json',
     '~/.ccgw/standalone-cli/config.yaml',
@@ -105,10 +106,10 @@ assertIncludesAny(
 assertIncludesAny(
   readme,
   [
-    'Retry ccgw-standalone-cli discover-credentials',
-    'Retry `ccgw-standalone-cli discover-credentials`',
-    'Retry ccgw-standalone-cli',
-    'Retry `ccgw-standalone-cli`',
+    'Retry ccgw discover-credentials',
+    'Retry `ccgw discover-credentials`',
+    'Retry ccgw',
+    'Retry `ccgw`',
   ],
   'standalone-cli/README.md missing-credentials retry guidance',
 )
@@ -118,7 +119,7 @@ assertIncludesAll(
   [
     'Install Claude Code if needed: npm install -g @anthropic-ai/claude-code',
     'Open a new shell and confirm claude --help works from PATH',
-    'Retry ccgw-standalone-cli [claude args]',
+    'Retry ccgw [claude args]',
   ],
   'standalone-cli/README.md missing-claude recovery',
 )
@@ -142,6 +143,16 @@ assertIncludesAny(
     '`standalone-cli/README.md`',
   ],
   'docs/standalone-cli.md canonical pointer',
+)
+
+assertIncludesAny(
+  repoDoc,
+  [
+    'package and global command name are both `ccgw`',
+    'global command name are both `ccgw`',
+    'npm package and global command name are both `ccgw`',
+  ],
+  'docs/standalone-cli.md package naming',
 )
 
 assertIncludesAny(
