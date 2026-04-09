@@ -10,7 +10,8 @@ const { bootstrapEnvironment } = await import(new URL('../src/environment/bootst
 const { prepareRuntimeEnvironment } = await import(new URL('../src/environment/prepare.ts', import.meta.url).href)
 const { runCli } = await import(new URL('../src/cli.ts', import.meta.url).href)
 
-const REAL_REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const REAL_PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const REAL_GATEWAY_ENTRYPOINT = resolve(REAL_PACKAGE_ROOT, 'dist', 'gateway', 'index.js')
 
 type DiscoveryCredentials = {
   accessToken?: string
@@ -245,8 +246,8 @@ async function captureRun(
     assert.deepEqual(harness.killCalls, [654], 'stale runtime metadata must not be reused')
     assert.equal(harness.spawnCalls.length, 1, 'stale runtime metadata must force a fresh process')
     assert.equal(harness.spawnCalls[0]?.command, 'node')
-    assert.deepEqual(harness.spawnCalls[0]?.args, ['dist/index.js', bootstrap.configPath])
-    assert.equal(harness.spawnCalls[0]?.cwd, REAL_REPO_ROOT)
+    assert.deepEqual(harness.spawnCalls[0]?.args, [REAL_GATEWAY_ENTRYPOINT, bootstrap.configPath])
+    assert.equal(harness.spawnCalls[0]?.cwd, REAL_PACKAGE_ROOT)
     assert.equal(harness.spawnCalls[0]?.logPath, bootstrap.workspacePaths.runtimeLogPath)
     assert.equal(
       harness.spawnCalls[0]?.env.HTTPS_PROXY,
@@ -276,17 +277,17 @@ async function captureRun(
     assert.deepEqual(harness.buildCalls, [
       {
         command: 'npm',
-        args: ['run', 'build'],
-        cwd: REAL_REPO_ROOT,
+        args: ['run', 'build:gateway-bundle'],
+        cwd: REAL_PACKAGE_ROOT,
       },
     ])
     assert.equal(harness.spawnCalls.length, 1)
     assert.equal(
       harness.spawnCalls[0]?.cwd,
-      REAL_REPO_ROOT,
-      'repo root resolution must ignore caller cwd and spawn from the standalone-cli repo root',
+      REAL_PACKAGE_ROOT,
+      'runtime preparation must ignore caller cwd and spawn from the standalone-cli package root',
     )
-    assert.deepEqual(harness.spawnCalls[0]?.args, ['dist/index.js', result.bootstrap.configPath])
+    assert.deepEqual(harness.spawnCalls[0]?.args, [REAL_GATEWAY_ENTRYPOINT, result.bootstrap.configPath])
   })
 }
 

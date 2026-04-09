@@ -14,8 +14,8 @@ const DEFAULT_RUNTIME_PORT = 8443
 const DEFAULT_TIMEOUT_MS = 15000
 const DEFAULT_POLL_INTERVAL_MS = 250
 const DEFAULT_HEALTH_REQUEST_TIMEOUT_MS = 250
-const ENTRYPOINT_SEGMENTS = ['dist', 'index.js'] as const
-const REPO_ROOT_SEGMENTS = ['..', '..', '..'] as const
+const PACKAGE_ROOT_SEGMENTS = ['..', '..'] as const
+const BUNDLED_GATEWAY_SEGMENTS = ['dist', 'gateway', 'index.js'] as const
 
 export interface BuildGatewayInput {
   command: string
@@ -198,8 +198,8 @@ function resolveSourceEnv(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return overrides ? { ...process.env, ...overrides } : process.env
 }
 
-function resolveRepoRoot(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), ...REPO_ROOT_SEGMENTS)
+function resolvePackageRoot(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), ...PACKAGE_ROOT_SEGMENTS)
 }
 
 async function checkHealthWithinTimeout(
@@ -303,11 +303,11 @@ export async function ensureGatewayRuntime(
   manifest: BootstrapManifest,
   options: EnsureRuntimeOptions = {},
 ): Promise<RuntimePreparationSummary> {
-  const repoRoot = resolveRepoRoot()
+  const packageRoot = resolvePackageRoot()
   const adapters = resolveRuntimeAdapters(options.runtime)
   const sourceEnv = resolveSourceEnv(options.processEnv)
   const { proxyEnv } = resolveProxyEnvironment(sourceEnv)
-  const entrypointPath = resolve(repoRoot, ...ENTRYPOINT_SEGMENTS)
+  const gatewayEntrypointPath = resolve(packageRoot, ...BUNDLED_GATEWAY_SEGMENTS)
   const runtimeLogPath = manifest.paths.runtimeLogPath
   const port = manifest.runtime?.port ?? DEFAULT_RUNTIME_PORT
   const healthUrl = manifest.runtime?.healthUrl ?? `http://127.0.0.1:${port}/_health`
@@ -347,11 +347,11 @@ export async function ensureGatewayRuntime(
   }
 
   let builtGateway = false
-  if (!(await adapters.fileExists(entrypointPath))) {
+  if (!(await adapters.fileExists(gatewayEntrypointPath))) {
     await adapters.buildGateway({
       command: 'npm',
-      args: ['run', 'build'],
-      cwd: repoRoot,
+      args: ['run', 'build:gateway-bundle'],
+      cwd: packageRoot,
     })
     builtGateway = true
   }
@@ -359,8 +359,8 @@ export async function ensureGatewayRuntime(
   const ownershipToken = randomUUID()
   const runtimeProcess = await adapters.spawnGateway({
     command: 'node',
-    args: ['dist/index.js', manifest.generatedConfig.path],
-    cwd: repoRoot,
+    args: [gatewayEntrypointPath, manifest.generatedConfig.path],
+    cwd: packageRoot,
     env: {
       ...sourceEnv,
       ...proxyEnv,

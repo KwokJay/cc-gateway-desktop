@@ -36,7 +36,9 @@
   },
   "scripts": {
     "test": "npm run build && npx tsx tests/run-all.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build:cli && npm run build:gateway-bundle",
+    "build:cli": "tsc -p tsconfig.json",
+    "build:gateway-bundle": "node scripts/build-gateway-bundle.mjs",
     "prepack": "npm run build",
     "test:environment": "tsx tests/environment-bootstrap.test.ts",
     "test:proxy-env": "tsx tests/proxy-env.test.ts",
